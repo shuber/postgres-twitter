@@ -29,13 +29,13 @@ DROP SCHEMA IF EXISTS "public";
 -- ############################################################################
 -- # Schemas
 -- ############################################################################
-CREATE SCHEMA IF NOT EXISTS "public";
+CREATE SCHEMA "public";
 
 
 -- ############################################################################
 -- # Extensions
 -- ############################################################################
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION "uuid-ossp";
 
 
 -- ############################################################################
@@ -43,7 +43,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ############################################################################
 
 -- Tweets
-CREATE TABLE IF NOT EXISTS tweets (
+CREATE TABLE tweets (
   id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   post      text NOT NULL,
   hashtags  text[] NOT NULL DEFAULT '{}',
@@ -56,7 +56,7 @@ ALTER TABLE tweets ADD CONSTRAINT post_length CHECK (char_length(post) <= 140);
 
 
 -- Tags
-CREATE TABLE IF NOT EXISTS tags (
+CREATE TABLE tags (
   id       uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   name     text NOT NULL UNIQUE,
   tweets   integer NOT NULL DEFAULT 0,
@@ -68,7 +68,7 @@ ALTER TABLE tags ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
 
 
 -- Taggings
-CREATE TABLE IF NOT EXISTS taggings (
+CREATE TABLE taggings (
   tag_id    uuid NOT NULL,
   tweet_id  uuid NOT NULL,
   PRIMARY KEY(tag_id, tweet_id)
