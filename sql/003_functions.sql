@@ -45,9 +45,24 @@ CREATE FUNCTION random_tweet_id()
 CREATE FUNCTION random_user_id()
   RETURNS uuid AS $$
     DECLARE
+      uuid uuid;
+    BEGIN
+      uuid := uuid_generate_v4();
+      RETURN random_user_id(uuid);
+    END;
+  $$ LANGUAGE plpgsql VOLATILE;
+
+CREATE FUNCTION random_user_id(exclude uuid)
+  RETURNS uuid AS $$
+    DECLARE
       user_id uuid;
     BEGIN
-      SELECT id FROM users ORDER BY random() LIMIT 1 INTO user_id;
+      SELECT id
+      FROM users
+      WHERE id != exclude
+      ORDER BY random()
+      LIMIT 1
+      INTO user_id;
       RETURN user_id;
     END;
   $$ LANGUAGE plpgsql VOLATILE;

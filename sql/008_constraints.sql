@@ -12,6 +12,23 @@ ALTER TABLE favorites
 
 
 -- ############################################################################
+-- # followers
+-- ############################################################################
+
+ALTER TABLE followers
+  ADD CONSTRAINT follower_fk FOREIGN KEY (follower_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE followers
+  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+-- Don't allow users to follow themselves
+ALTER TABLE followers
+  ADD CONSTRAINT user_id CHECK (user_id != follower_id);
+
+
+-- ############################################################################
 -- # mentions
 -- ############################################################################
 

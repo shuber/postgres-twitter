@@ -14,6 +14,21 @@ CREATE TRIGGER update_user_favorites
 
 
 -- ############################################################################
+-- # followers
+-- ############################################################################
+
+CREATE TRIGGER update_follower_following
+  AFTER INSERT OR DELETE ON followers
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'following', 'follower_id', 'id');
+
+CREATE TRIGGER update_user_followers
+  AFTER INSERT OR DELETE ON followers
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'followers', 'user_id', 'id');
+
+
+-- ############################################################################
 -- # mentions
 -- ############################################################################
 

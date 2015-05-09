@@ -52,9 +52,24 @@ CREATE FUNCTION random_tweet_id()
 CREATE FUNCTION random_user_id()
   RETURNS uuid AS $$
     DECLARE
+      uuid uuid;
+    BEGIN
+      uuid := uuid_generate_v4();
+      RETURN random_user_id(uuid);
+    END;
+  $$ LANGUAGE plpgsql VOLATILE;
+
+CREATE FUNCTION random_user_id(exclude uuid)
+  RETURNS uuid AS $$
+    DECLARE
       user_id uuid;
     BEGIN
-      SELECT id FROM users ORDER BY random() LIMIT 1 INTO user_id;
+      SELECT id
+      FROM users
+      WHERE id != exclude
+      ORDER BY random()
+      LIMIT 1
+      INTO user_id;
       RETURN user_id;
     END;
   $$ LANGUAGE plpgsql VOLATILE;
@@ -224,6 +239,12 @@ CREATE TABLE favorites (
   PRIMARY KEY(user_id, tweet_id)
 );
 
+CREATE TABLE followers (
+  follower_id  uuid NOT NULL,
+  user_id      uuid NOT NULL,
+  PRIMARY KEY(follower_id, user_id)
+);
+
 CREATE TABLE mentions (
   user_id   uuid NOT NULL,
   tweet_id  uuid NOT NULL,
@@ -259,6 +280,8 @@ CREATE TABLE users (
   id         uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   username   text NOT NULL UNIQUE,
   favorites  integer NOT NULL DEFAULT 0,
+  followers  integer NOT NULL DEFAULT 0,
+  following  integer NOT NULL DEFAULT 0,
   mentions   integer NOT NULL DEFAULT 0,
   tweets     integer NOT NULL DEFAULT 0,
   created    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
@@ -275,6 +298,23 @@ ALTER TABLE favorites
 ALTER TABLE favorites
   ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
   MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+-- ############################################################################
+-- # followers
+-- ############################################################################
+
+ALTER TABLE followers
+  ADD CONSTRAINT follower_fk FOREIGN KEY (follower_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE followers
+  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+-- Don't allow users to follow themselves
+ALTER TABLE followers
+  ADD CONSTRAINT user_id CHECK (user_id != follower_id);
 
 
 -- ############################################################################
@@ -364,6 +404,21 @@ CREATE TRIGGER update_user_favorites
   AFTER INSERT OR DELETE ON favorites
   FOR EACH ROW
   EXECUTE PROCEDURE counter_cache('users', 'favorites', 'user_id', 'user_id');
+
+
+-- ############################################################################
+-- # followers
+-- ############################################################################
+
+CREATE TRIGGER update_follower_following
+  AFTER INSERT OR DELETE ON followers
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'following', 'follower_id', 'id');
+
+CREATE TRIGGER update_user_followers
+  AFTER INSERT OR DELETE ON followers
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'followers', 'user_id', 'id');
 
 
 -- ############################################################################
@@ -460,12 +515,16 @@ INSERT INTO favorites (user_id, tweet_id)
 SELECT id as user_id, random_tweet_id() as tweet_id
 FROM users;
 
+INSERT INTO followers (follower_id, user_id)
+SELECT id as follower_id, random_user_id(id) as user_id
+FROM users;
+
 
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
 
-SELECT id, username, favorites, mentions, tweets FROM users;
+SELECT id, username, followers, following, favorites, mentions, tweets FROM users;
 SELECT * FROM mentions;
 
 -------------------------------------------------------------------------------

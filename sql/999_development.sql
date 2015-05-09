@@ -21,12 +21,16 @@ INSERT INTO favorites (user_id, tweet_id)
 SELECT id as user_id, random_tweet_id() as tweet_id
 FROM users;
 
+INSERT INTO followers (follower_id, user_id)
+SELECT id as follower_id, random_user_id(id) as user_id
+FROM users;
+
 
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
 
-SELECT id, username, favorites, mentions, tweets FROM users;
+SELECT id, username, followers, following, favorites, mentions, tweets FROM users;
 SELECT * FROM mentions;
 
 -------------------------------------------------------------------------------
