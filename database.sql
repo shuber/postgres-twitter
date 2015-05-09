@@ -88,13 +88,21 @@ ALTER TABLE taggings
 -- ############################################################################
 CREATE FUNCTION parse_hashtags_from_post()
   RETURNS trigger AS $$
+    DECLARE
+      post text;
+      tags text[];
     BEGIN
-      -- Parse tweets.post with something like the following regex below and
-      -- update tweets.hashtag.
-      --
-      --   regexp_matches(NEW.post, '#(\S+)', 'g');
+      post := lower(NEW.post);
+      tags := ARRAY['one', 'two', 'three'];
+      -- tags := regexp_matches(post, '#(\S+)', 'g');
 
-      RETURN NULL;
+      -- EXECUTE 'SELECT regexp_matches($1, $2, $3)'
+      -- INTO tags
+      -- USING post, '#(\S+)', 'g';
+
+      NEW.hashtags := tags;
+
+      RETURN NEW;
     END;
   $$ LANGUAGE plpgsql;
 
@@ -103,7 +111,7 @@ CREATE FUNCTION parse_hashtags_from_post()
 -- # Triggers
 -- ############################################################################
 CREATE TRIGGER parse_hashtags
-  AFTER INSERT ON tweets
+  BEFORE INSERT OR UPDATE ON tweets
   FOR EACH ROW EXECUTE PROCEDURE parse_hashtags_from_post();
 
 
@@ -123,3 +131,5 @@ INSERT INTO tweets (post) VALUES
 SELECT * FROM tweets;
 SELECT * FROM taggings;
 SELECT * FROM tags;
+
+SELECT regexp_matches(post, '#(\S+)', 'g') from tweets;
