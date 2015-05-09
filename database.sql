@@ -24,6 +24,7 @@ DROP TRIGGER IF EXISTS create_mentions ON tweets;
 DROP TRIGGER IF EXISTS update_tag_tweets ON taggings;
 DROP TRIGGER IF EXISTS update_user_mentions ON mentions;
 DROP TRIGGER IF EXISTS update_user_tweets ON tweets;
+DROP TRIGGER IF EXISTS delete_stale_tags ON tags;
 
 DROP FUNCTION IF EXISTS parse_mentions_from_post();
 DROP FUNCTION IF EXISTS parse_tags_from_post();
@@ -32,6 +33,7 @@ DROP FUNCTION IF EXISTS create_new_taggings();
 DROP FUNCTION IF EXISTS create_new_mentions();
 DROP FUNCTION IF EXISTS random_user_id();
 DROP FUNCTION IF EXISTS counter_cache();
+DROP FUNCTION IF EXISTS delete_stale_tag();
 
 DROP TABLE IF EXISTS "mentions";
 DROP TABLE IF EXISTS "taggings";
@@ -139,6 +141,7 @@ ALTER TABLE mentions
 -- ############################################################################
 -- # Functions
 -- ############################################################################
+
 CREATE FUNCTION parse_tokens(content text, prefix text)
   RETURNS text[] AS $$
     DECLARE
@@ -164,6 +167,21 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
       RETURN tokens;
     END;
   $$ LANGUAGE plpgsql STABLE;
+
+CREATE FUNCTION random_user_id()
+  RETURNS uuid AS $$
+    DECLARE
+      user_id uuid;
+    BEGIN
+      SELECT id FROM users ORDER BY random() LIMIT 1 INTO user_id;
+      RETURN user_id;
+    END;
+  $$ LANGUAGE plpgsql VOLATILE;
+
+
+-- ############################################################################
+-- # Trigger functions
+-- ############################################################################
 
 CREATE FUNCTION parse_mentions_from_post()
   RETURNS trigger AS $$
@@ -265,15 +283,13 @@ CREATE FUNCTION create_new_mentions()
     END;
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION random_user_id()
-  RETURNS uuid AS $$
-    DECLARE
-      user_id uuid;
+CREATE FUNCTION delete_stale_tag()
+  RETURNS trigger AS $$
     BEGIN
-      SELECT id FROM users ORDER BY random() LIMIT 1 INTO user_id;
-      RETURN user_id;
+      DELETE FROM tags WHERE id = OLD.id;
+      RETURN OLD;
     END;
-  $$ LANGUAGE plpgsql VOLATILE;
+  $$ LANGUAGE plpgsql;
 
 
 -- ############################################################################
@@ -285,27 +301,38 @@ CREATE TRIGGER parse_mentions
 
 CREATE TRIGGER parse_tags
   BEFORE INSERT OR UPDATE ON tweets
-  FOR EACH ROW EXECUTE PROCEDURE parse_tags_from_post();
+  FOR EACH ROW
+  EXECUTE PROCEDURE parse_tags_from_post();
 
 CREATE TRIGGER create_taggings
   AFTER INSERT OR UPDATE ON tweets
-  FOR EACH ROW EXECUTE PROCEDURE create_new_taggings();
+  FOR EACH ROW
+  EXECUTE PROCEDURE create_new_taggings();
 
 CREATE TRIGGER create_mentions
   AFTER INSERT OR UPDATE ON tweets
-  FOR EACH ROW EXECUTE PROCEDURE create_new_mentions();
+  FOR EACH ROW
+  EXECUTE PROCEDURE create_new_mentions();
 
 CREATE TRIGGER update_tag_tweets
   AFTER INSERT OR DELETE ON taggings
-  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tags', 'tweets', 'tag_id', 'tag_id');
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('tags', 'tweets', 'tag_id', 'tag_id');
 
 CREATE TRIGGER update_user_mentions
   AFTER INSERT OR DELETE ON mentions
-  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'mentions', 'user_id', 'user_id');
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'mentions', 'user_id', 'user_id');
 
 CREATE TRIGGER update_user_tweets
   AFTER INSERT OR DELETE ON tweets
-  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
+
+CREATE TRIGGER delete_stale_tags
+  AFTER UPDATE ON tags
+  FOR EACH ROW WHEN (NEW.tweets = 0)
+  EXECUTE PROCEDURE delete_stale_tag();
 
 
 -- ############################################################################
