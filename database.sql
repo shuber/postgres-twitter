@@ -20,6 +20,7 @@
 DROP TRIGGER IF EXISTS parse_mentions ON tweets;
 DROP TRIGGER IF EXISTS parse_tags ON tweets;
 DROP TRIGGER IF EXISTS create_taggings ON tweets;
+DROP TRIGGER IF EXISTS delete_taggings ON tweets;
 DROP TRIGGER IF EXISTS create_mentions ON tweets;
 DROP TRIGGER IF EXISTS update_tag_tweets ON taggings;
 DROP TRIGGER IF EXISTS update_user_mentions ON mentions;
@@ -30,6 +31,7 @@ DROP FUNCTION IF EXISTS parse_mentions_from_post();
 DROP FUNCTION IF EXISTS parse_tags_from_post();
 DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP FUNCTION IF EXISTS create_new_taggings();
+DROP FUNCTION IF EXISTS delete_old_taggings();
 DROP FUNCTION IF EXISTS create_new_mentions();
 DROP FUNCTION IF EXISTS random_user_id();
 DROP FUNCTION IF EXISTS counter_cache();
@@ -223,6 +225,23 @@ CREATE FUNCTION create_new_taggings()
     END;
   $$ LANGUAGE plpgsql;
 
+CREATE FUNCTION delete_old_taggings()
+  RETURNS trigger AS $$
+    DECLARE
+      tag text;
+    BEGIN
+      FOREACH tag IN ARRAY OLD.tags LOOP
+        IF NOT NEW.tags @> ARRAY[tag] THEN
+          DELETE FROM taggings USING tags
+          WHERE taggings.tweet_id = NEW.id
+          AND tags.name = tag;
+        END IF;
+      END LOOP;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
 CREATE FUNCTION counter_cache()
   RETURNS trigger AS $$
     DECLARE
@@ -309,6 +328,11 @@ CREATE TRIGGER create_taggings
   FOR EACH ROW
   EXECUTE PROCEDURE create_new_taggings();
 
+CREATE TRIGGER delete_taggings
+  AFTER UPDATE ON tweets
+  FOR EACH ROW WHEN (NEW.tags IS DISTINCT FROM OLD.tags)
+  EXECUTE PROCEDURE delete_old_taggings();
+
 CREATE TRIGGER create_mentions
   AFTER INSERT OR UPDATE ON tweets
   FOR EACH ROW
@@ -357,6 +381,11 @@ INSERT INTO tweets (post, user_id) VALUES
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
+SELECT id, username, mentions, tweets FROM users;
+SELECT * FROM mentions;
+
+SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
+
 DELETE FROM tweets
 WHERE id IN (
   SELECT t.id
@@ -365,8 +394,16 @@ WHERE id IN (
   LIMIT 1
 );
 
-SELECT id, username, mentions, tweets FROM users;
-SELECT * FROM mentions;
+UPDATE tweets
+SET post = 'replaced!'
+WHERE id IN (
+  SELECT t.id
+  FROM tweets t
+  ORDER BY random()
+  LIMIT 1
+);
+
 SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
+
 SELECT * FROM taggings;
 SELECT id, name, tweets FROM tags;
