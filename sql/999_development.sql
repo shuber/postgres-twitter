@@ -25,6 +25,11 @@ INSERT INTO followers (follower_id, user_id)
 SELECT id as follower_id, random_user_id(id) as user_id
 FROM users;
 
+INSERT INTO replies (tweet_id, reply_id)
+SELECT id as tweet_id, random_tweet_id(id) as reply_id
+FROM tweets
+LIMIT 2;
+
 INSERT INTO retweets (tweet_id, retweet_id)
 SELECT id as tweet_id, random_tweet_id(id) as retweet_id
 FROM tweets
@@ -40,7 +45,7 @@ SELECT * FROM mentions;
 
 -------------------------------------------------------------------------------
 
-SELECT username, tweets.favorites, retweets, tweets.mentions, tags
+SELECT username, tweets.favorites, replies, retweets, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 DELETE FROM tweets
@@ -60,7 +65,7 @@ WHERE id IN (
   LIMIT 1
 );
 
-SELECT username, tweets.favorites, retweets, tweets.mentions, tags
+SELECT username, tweets.favorites, replies, retweets, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 -------------------------------------------------------------------------------

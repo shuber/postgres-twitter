@@ -36,11 +36,11 @@ The `compile` executable combines all files under sql/ into `compiled.sql` or `d
 
 ## Todo
 
-* [ ] replies
 * [ ] seed database from twitter stream
 * [x] favorites
 * [x] followers
 * [x] mentions
+* [x] replies
 * [x] retweets
 * [x] tags
 * [x] tweets

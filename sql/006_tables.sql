@@ -16,6 +16,18 @@ CREATE TABLE mentions (
   PRIMARY KEY(user_id, tweet_id)
 );
 
+CREATE TABLE replies (
+  tweet_id    uuid NOT NULL,
+  reply_id  uuid NOT NULL,
+  PRIMARY KEY(tweet_id, reply_id)
+);
+
+CREATE TABLE retweets (
+  tweet_id    uuid NOT NULL,
+  retweet_id  uuid NOT NULL,
+  PRIMARY KEY(tweet_id, retweet_id)
+);
+
 CREATE TABLE tags (
   id       uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   name     text NOT NULL UNIQUE,
@@ -30,17 +42,12 @@ CREATE TABLE taggings (
   PRIMARY KEY(tag_id, tweet_id)
 );
 
-CREATE TABLE retweets (
-  tweet_id    uuid NOT NULL,
-  retweet_id  uuid NOT NULL,
-  PRIMARY KEY(tweet_id, retweet_id)
-);
-
 CREATE TABLE tweets (
   id         uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   user_id    uuid NOT NULL,
   post       text NOT NULL,
   favorites  integer NOT NULL DEFAULT 0,
+  replies    integer NOT NULL DEFAULT 0,
   retweets   integer NOT NULL DEFAULT 0,
   mentions   text[] NOT NULL DEFAULT '{}',
   tags       text[] NOT NULL DEFAULT '{}',

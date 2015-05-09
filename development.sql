@@ -266,6 +266,18 @@ CREATE TABLE mentions (
   PRIMARY KEY(user_id, tweet_id)
 );
 
+CREATE TABLE replies (
+  tweet_id    uuid NOT NULL,
+  reply_id  uuid NOT NULL,
+  PRIMARY KEY(tweet_id, reply_id)
+);
+
+CREATE TABLE retweets (
+  tweet_id    uuid NOT NULL,
+  retweet_id  uuid NOT NULL,
+  PRIMARY KEY(tweet_id, retweet_id)
+);
+
 CREATE TABLE tags (
   id       uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   name     text NOT NULL UNIQUE,
@@ -280,17 +292,12 @@ CREATE TABLE taggings (
   PRIMARY KEY(tag_id, tweet_id)
 );
 
-CREATE TABLE retweets (
-  tweet_id    uuid NOT NULL,
-  retweet_id  uuid NOT NULL,
-  PRIMARY KEY(tweet_id, retweet_id)
-);
-
 CREATE TABLE tweets (
   id         uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   user_id    uuid NOT NULL,
   post       text NOT NULL,
   favorites  integer NOT NULL DEFAULT 0,
+  replies    integer NOT NULL DEFAULT 0,
   retweets   integer NOT NULL DEFAULT 0,
   mentions   text[] NOT NULL DEFAULT '{}',
   tags       text[] NOT NULL DEFAULT '{}',
@@ -349,6 +356,19 @@ ALTER TABLE mentions
 
 ALTER TABLE mentions
   ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+-- ############################################################################
+-- # replies
+-- ############################################################################
+
+ALTER TABLE replies
+  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE replies
+  ADD CONSTRAINT reply_fk FOREIGN KEY (reply_id) REFERENCES tweets (id)
   MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
 
 
@@ -467,6 +487,16 @@ CREATE TRIGGER update_user_mentions
 
 
 -- ############################################################################
+-- # replies
+-- ############################################################################
+
+CREATE TRIGGER update_tweet_replies
+  AFTER INSERT OR DELETE ON replies
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('tweets', 'replies', 'tweet_id', 'id');
+
+
+-- ############################################################################
 -- # reweets
 -- ############################################################################
 
@@ -564,6 +594,11 @@ INSERT INTO followers (follower_id, user_id)
 SELECT id as follower_id, random_user_id(id) as user_id
 FROM users;
 
+INSERT INTO replies (tweet_id, reply_id)
+SELECT id as tweet_id, random_tweet_id(id) as reply_id
+FROM tweets
+LIMIT 2;
+
 INSERT INTO retweets (tweet_id, retweet_id)
 SELECT id as tweet_id, random_tweet_id(id) as retweet_id
 FROM tweets
@@ -579,7 +614,7 @@ SELECT * FROM mentions;
 
 -------------------------------------------------------------------------------
 
-SELECT username, tweets.favorites, retweets, tweets.mentions, tags
+SELECT username, tweets.favorites, replies, retweets, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 DELETE FROM tweets
@@ -599,7 +634,7 @@ WHERE id IN (
   LIMIT 1
 );
 
-SELECT username, tweets.favorites, retweets, tweets.mentions, tags
+SELECT username, tweets.favorites, replies, retweets, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 -------------------------------------------------------------------------------
