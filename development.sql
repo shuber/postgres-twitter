@@ -45,6 +45,23 @@ CREATE FUNCTION random_user_id()
       RETURN user_id;
     END;
   $$ LANGUAGE plpgsql VOLATILE;
+-- ############################################################################
+-- # tweets
+-- ############################################################################
+
+CREATE FUNCTION delete_stale_tag()
+  RETURNS trigger AS $$
+    BEGIN
+      DELETE FROM tags WHERE id = OLD.id;
+      RETURN OLD;
+    END;
+  $$ LANGUAGE plpgsql;
+
+
+-- ############################################################################
+-- # tweets
+-- ############################################################################
+
 CREATE FUNCTION parse_mentions_from_post()
   RETURNS trigger AS $$
     BEGIN
@@ -52,6 +69,47 @@ CREATE FUNCTION parse_mentions_from_post()
       RETURN NEW;
     END;
   $$ LANGUAGE plpgsql;
+
+CREATE FUNCTION create_new_mentions()
+  RETURNS trigger AS $$
+    DECLARE
+      username text;
+      user_id uuid;
+    BEGIN
+      FOREACH username IN ARRAY NEW.mentions LOOP
+        BEGIN
+          EXECUTE 'SELECT id FROM users WHERE username = $1' INTO user_id USING LOWER(username);
+
+          IF user_id IS NOT NULL THEN
+            INSERT INTO mentions (user_id, tweet_id) VALUES (user_id, NEW.id);
+          END IF;
+        EXCEPTION WHEN unique_violation THEN
+        END;
+      END LOOP;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
+CREATE FUNCTION delete_old_mentions()
+  RETURNS trigger AS $$
+    DECLARE
+      mention text;
+    BEGIN
+      FOREACH mention IN ARRAY OLD.mentions LOOP
+        IF NOT NEW.mentions @> ARRAY[mention] THEN
+          DELETE FROM mentions USING users
+          WHERE mentions.user_id = users.id
+          AND mentions.tweet_id = NEW.id
+          AND users.username = mention;
+        END IF;
+      END LOOP;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
+-------------------------------------------------------------------------------
 
 CREATE FUNCTION parse_tags_from_post()
   RETURNS trigger AS $$
@@ -100,53 +158,6 @@ CREATE FUNCTION delete_old_taggings()
       END LOOP;
 
       RETURN NEW;
-    END;
-  $$ LANGUAGE plpgsql;
-
-CREATE FUNCTION create_new_mentions()
-  RETURNS trigger AS $$
-    DECLARE
-      username text;
-      user_id uuid;
-    BEGIN
-      FOREACH username IN ARRAY NEW.mentions LOOP
-        BEGIN
-          EXECUTE 'SELECT id FROM users WHERE username = $1' INTO user_id USING LOWER(username);
-
-          IF user_id IS NOT NULL THEN
-            INSERT INTO mentions (user_id, tweet_id) VALUES (user_id, NEW.id);
-          END IF;
-        EXCEPTION WHEN unique_violation THEN
-        END;
-      END LOOP;
-
-      RETURN NEW;
-    END;
-  $$ LANGUAGE plpgsql;
-
-CREATE FUNCTION delete_old_mentions()
-  RETURNS trigger AS $$
-    DECLARE
-      mention text;
-    BEGIN
-      FOREACH mention IN ARRAY OLD.mentions LOOP
-        IF NOT NEW.mentions @> ARRAY[mention] THEN
-          DELETE FROM mentions USING users
-          WHERE mentions.user_id = users.id
-          AND mentions.tweet_id = NEW.id
-          AND users.username = mention;
-        END IF;
-      END LOOP;
-
-      RETURN NEW;
-    END;
-  $$ LANGUAGE plpgsql;
-
-CREATE FUNCTION delete_stale_tag()
-  RETURNS trigger AS $$
-    BEGIN
-      DELETE FROM tags WHERE id = OLD.id;
-      RETURN OLD;
     END;
   $$ LANGUAGE plpgsql;
 CREATE FUNCTION counter_cache()
@@ -228,6 +239,7 @@ CREATE TABLE users (
 -- ############################################################################
 -- # mentions
 -- ############################################################################
+
 ALTER TABLE mentions
   ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
   MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
@@ -240,12 +252,15 @@ ALTER TABLE mentions
 -- ############################################################################
 -- # tags
 -- ############################################################################
-ALTER TABLE tags ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
+
+ALTER TABLE tags
+  ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
 
 
 -- ############################################################################
 -- # taggings
 -- ############################################################################
+
 ALTER TABLE taggings
   ADD CONSTRAINT tag_fk FOREIGN KEY (tag_id) REFERENCES tags (id)
   MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
@@ -258,37 +273,47 @@ ALTER TABLE taggings
 -- ############################################################################
 -- # tweets
 -- ############################################################################
+
 ALTER TABLE tweets
   ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
   MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
 
-ALTER TABLE tweets ADD CONSTRAINT post_length CHECK (char_length(post) <= 140);
+ALTER TABLE tweets ADD
+  CONSTRAINT post_length CHECK (char_length(post) <= 140);
 
 
 -- ############################################################################
 -- # users
 -- ############################################################################
-ALTER TABLE users ADD CONSTRAINT mentions_count CHECK (mentions >= 0);
-ALTER TABLE users ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
+
+ALTER TABLE users
+  ADD CONSTRAINT mentions_count CHECK (mentions >= 0);
+
+ALTER TABLE users
+  ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
 -- ############################################################################
 -- # tags
 -- ############################################################################
+
 CREATE UNIQUE INDEX ON tags (LOWER(name));
 
 
 -- ############################################################################
 -- # tweets
 -- ############################################################################
+
 CREATE INDEX ON tweets (user_id);
 
 
 -- ############################################################################
 -- # users
 -- ############################################################################
+
 CREATE UNIQUE INDEX ON users (LOWER(username));
 -- ############################################################################
 -- # mentions
 -- ############################################################################
+
 CREATE TRIGGER update_user_mentions
   AFTER INSERT OR DELETE ON mentions
   FOR EACH ROW
@@ -298,6 +323,7 @@ CREATE TRIGGER update_user_mentions
 -- ############################################################################
 -- # tags
 -- ############################################################################
+
 CREATE TRIGGER delete_stale_tags
   AFTER UPDATE ON tags
   FOR EACH ROW WHEN (NEW.tweets = 0)
@@ -307,6 +333,7 @@ CREATE TRIGGER delete_stale_tags
 -- ############################################################################
 -- # taggings
 -- ############################################################################
+
 CREATE TRIGGER update_tag_tweets
   AFTER INSERT OR DELETE ON taggings
   FOR EACH ROW
@@ -316,11 +343,13 @@ CREATE TRIGGER update_tag_tweets
 -- ############################################################################
 -- # tweets
 -- ############################################################################
+
 CREATE TRIGGER update_user_tweets
   AFTER INSERT OR DELETE ON tweets
   FOR EACH ROW
   EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
 
+-------------------------------------------------------------------------------
 
 CREATE TRIGGER parse_mentions
   BEFORE INSERT OR UPDATE ON tweets
@@ -336,6 +365,7 @@ CREATE TRIGGER delete_mentions
   FOR EACH ROW WHEN (NEW.mentions IS DISTINCT FROM OLD.mentions)
   EXECUTE PROCEDURE delete_old_mentions();
 
+-------------------------------------------------------------------------------
 
 CREATE TRIGGER parse_taggings
   BEFORE INSERT OR UPDATE ON tweets
@@ -354,6 +384,7 @@ CREATE TRIGGER delete_taggings
 -- ############################################################################
 -- # Seed data
 -- ############################################################################
+
 INSERT INTO users (username) VALUES
   ('bob'),
   ('doug'),
@@ -373,10 +404,14 @@ INSERT INTO tweets (post, user_id) VALUES
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
+
 SELECT id, username, mentions, tweets FROM users;
 SELECT * FROM mentions;
 
-SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
+-------------------------------------------------------------------------------
+
+SELECT username, post, tweets.mentions, tags
+FROM tweets JOIN users on tweets.user_id = users.id;
 
 DELETE FROM tweets
 WHERE id IN (
@@ -395,7 +430,10 @@ WHERE id IN (
   LIMIT 1
 );
 
-SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
+SELECT username, post, tweets.mentions, tags
+FROM tweets JOIN users on tweets.user_id = users.id;
+
+-------------------------------------------------------------------------------
 
 SELECT * FROM taggings;
 SELECT id, name, tweets FROM tags;

@@ -1,6 +1,7 @@
 -- ############################################################################
 -- # Seed data
 -- ############################################################################
+
 INSERT INTO users (username) VALUES
   ('bob'),
   ('doug'),
@@ -20,10 +21,14 @@ INSERT INTO tweets (post, user_id) VALUES
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
+
 SELECT id, username, mentions, tweets FROM users;
 SELECT * FROM mentions;
 
-SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
+-------------------------------------------------------------------------------
+
+SELECT username, post, tweets.mentions, tags
+FROM tweets JOIN users on tweets.user_id = users.id;
 
 DELETE FROM tweets
 WHERE id IN (
@@ -42,7 +47,10 @@ WHERE id IN (
   LIMIT 1
 );
 
-SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
+SELECT username, post, tweets.mentions, tags
+FROM tweets JOIN users on tweets.user_id = users.id;
+
+-------------------------------------------------------------------------------
 
 SELECT * FROM taggings;
 SELECT id, name, tweets FROM tags;

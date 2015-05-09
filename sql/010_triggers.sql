@@ -1,6 +1,7 @@
 -- ############################################################################
 -- # mentions
 -- ############################################################################
+
 CREATE TRIGGER update_user_mentions
   AFTER INSERT OR DELETE ON mentions
   FOR EACH ROW
@@ -10,6 +11,7 @@ CREATE TRIGGER update_user_mentions
 -- ############################################################################
 -- # tags
 -- ############################################################################
+
 CREATE TRIGGER delete_stale_tags
   AFTER UPDATE ON tags
   FOR EACH ROW WHEN (NEW.tweets = 0)
@@ -19,6 +21,7 @@ CREATE TRIGGER delete_stale_tags
 -- ############################################################################
 -- # taggings
 -- ############################################################################
+
 CREATE TRIGGER update_tag_tweets
   AFTER INSERT OR DELETE ON taggings
   FOR EACH ROW
@@ -28,11 +31,13 @@ CREATE TRIGGER update_tag_tweets
 -- ############################################################################
 -- # tweets
 -- ############################################################################
+
 CREATE TRIGGER update_user_tweets
   AFTER INSERT OR DELETE ON tweets
   FOR EACH ROW
   EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
 
+-------------------------------------------------------------------------------
 
 CREATE TRIGGER parse_mentions
   BEFORE INSERT OR UPDATE ON tweets
@@ -48,6 +53,7 @@ CREATE TRIGGER delete_mentions
   FOR EACH ROW WHEN (NEW.mentions IS DISTINCT FROM OLD.mentions)
   EXECUTE PROCEDURE delete_old_mentions();
 
+-------------------------------------------------------------------------------
 
 CREATE TRIGGER parse_taggings
   BEFORE INSERT OR UPDATE ON tweets

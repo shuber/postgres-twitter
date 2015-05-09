@@ -1,3 +1,20 @@
+-- ############################################################################
+-- # tweets
+-- ############################################################################
+
+CREATE FUNCTION delete_stale_tag()
+  RETURNS trigger AS $$
+    BEGIN
+      DELETE FROM tags WHERE id = OLD.id;
+      RETURN OLD;
+    END;
+  $$ LANGUAGE plpgsql;
+
+
+-- ############################################################################
+-- # tweets
+-- ############################################################################
+
 CREATE FUNCTION parse_mentions_from_post()
   RETURNS trigger AS $$
     BEGIN
@@ -5,6 +22,47 @@ CREATE FUNCTION parse_mentions_from_post()
       RETURN NEW;
     END;
   $$ LANGUAGE plpgsql;
+
+CREATE FUNCTION create_new_mentions()
+  RETURNS trigger AS $$
+    DECLARE
+      username text;
+      user_id uuid;
+    BEGIN
+      FOREACH username IN ARRAY NEW.mentions LOOP
+        BEGIN
+          EXECUTE 'SELECT id FROM users WHERE username = $1' INTO user_id USING LOWER(username);
+
+          IF user_id IS NOT NULL THEN
+            INSERT INTO mentions (user_id, tweet_id) VALUES (user_id, NEW.id);
+          END IF;
+        EXCEPTION WHEN unique_violation THEN
+        END;
+      END LOOP;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
+CREATE FUNCTION delete_old_mentions()
+  RETURNS trigger AS $$
+    DECLARE
+      mention text;
+    BEGIN
+      FOREACH mention IN ARRAY OLD.mentions LOOP
+        IF NOT NEW.mentions @> ARRAY[mention] THEN
+          DELETE FROM mentions USING users
+          WHERE mentions.user_id = users.id
+          AND mentions.tweet_id = NEW.id
+          AND users.username = mention;
+        END IF;
+      END LOOP;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
+-------------------------------------------------------------------------------
 
 CREATE FUNCTION parse_tags_from_post()
   RETURNS trigger AS $$
@@ -53,52 +111,5 @@ CREATE FUNCTION delete_old_taggings()
       END LOOP;
 
       RETURN NEW;
-    END;
-  $$ LANGUAGE plpgsql;
-
-CREATE FUNCTION create_new_mentions()
-  RETURNS trigger AS $$
-    DECLARE
-      username text;
-      user_id uuid;
-    BEGIN
-      FOREACH username IN ARRAY NEW.mentions LOOP
-        BEGIN
-          EXECUTE 'SELECT id FROM users WHERE username = $1' INTO user_id USING LOWER(username);
-
-          IF user_id IS NOT NULL THEN
-            INSERT INTO mentions (user_id, tweet_id) VALUES (user_id, NEW.id);
-          END IF;
-        EXCEPTION WHEN unique_violation THEN
-        END;
-      END LOOP;
-
-      RETURN NEW;
-    END;
-  $$ LANGUAGE plpgsql;
-
-CREATE FUNCTION delete_old_mentions()
-  RETURNS trigger AS $$
-    DECLARE
-      mention text;
-    BEGIN
-      FOREACH mention IN ARRAY OLD.mentions LOOP
-        IF NOT NEW.mentions @> ARRAY[mention] THEN
-          DELETE FROM mentions USING users
-          WHERE mentions.user_id = users.id
-          AND mentions.tweet_id = NEW.id
-          AND users.username = mention;
-        END IF;
-      END LOOP;
-
-      RETURN NEW;
-    END;
-  $$ LANGUAGE plpgsql;
-
-CREATE FUNCTION delete_stale_tag()
-  RETURNS trigger AS $$
-    BEGIN
-      DELETE FROM tags WHERE id = OLD.id;
-      RETURN OLD;
     END;
   $$ LANGUAGE plpgsql;
