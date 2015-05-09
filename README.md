@@ -14,16 +14,47 @@ This is an experimental build of a simple "twitter" application in Postgres.
 
 ## Ideas for Organization
 
-    000_development.sql
-    001_schemas.sql
-    002_extensions.sql
-    003_functions.sql
-    004_trigger_functions.sql
-    005_tables.sql
-    006_constraints.sql
-    007_triggers.sql
-    008_indexes.sql
-    009_api.sql
+    bin/
+      compile
+    sql/
+      000_development.sql
+      001_schemas.sql
+      002_extensions.sql
+      003_functions.sql
+      004_trigger_functions.sql
+      005_tables.sql
+      006_constraints.sql
+      007_triggers.sql
+      008_indexes.sql
+      009_api.sql
+    test/
+
+
+## Ideas for API
+
+#### The `random` schema
+
+This is mostly for development. This object contains methods to return a random record from various tables. Also add `_id` suffixed versions of the methods to return a random record's primary key.
+
+* `random.tag()`
+* `random.tweet()`
+* `random.user()`
+
+#### The `tweets` schema
+
+Public API for interacting with tweets
+
+* `tweets.create`
+* `tweets.delete`
+* `tweets.find`
+* `tweets.for_user`
+* `tweets.update`
+
+Public API for interacting with tags
+
+* `tags.find_or_create(name text)`
+* `tags.listen(names text[])`
+* `tags.tweets(names text[])`
 
 
 ## Sample Input
