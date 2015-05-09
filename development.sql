@@ -1,123 +1,14 @@
--- ############################################################################
--- # Notes and ideas
--- ############################################################################
 
--- Consider dropping tags.id and making tags.name the primary key.
--- Then taggings.tag_id can be replaced with taggings.name.
-
--- Make tables "private". Create views for application to interact with.
--- This should make "migrations" easier as well since applications don't
--- interact with the tables directly.
-
--- Use default schemas for different parts of the application since they
--- can be replicated with different rules. Maybe there can even be some
--- kind of "cache" schema.
-
-
--- ############################################################################
--- # Drop everything in reverse (for development)                        DANGER
--- ############################################################################
+-- Silently drop everything in reverse (for development)
 SET client_min_messages TO WARNING;
 DROP SCHEMA "public" CASCADE;
 SET client_min_messages TO NOTICE;
-
-
--- ############################################################################
--- # Schemas
--- ############################################################################
 CREATE SCHEMA "public";
-
-
--- ############################################################################
--- # Extensions
--- ############################################################################
 CREATE EXTENSION "uuid-ossp";
-
-
--- ############################################################################
--- # Tables
--- ############################################################################
-
--- Users
-CREATE TABLE users (
-  id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
-  username  text NOT NULL UNIQUE,
-  mentions  integer NOT NULL DEFAULT 0,
-  tweets    integer NOT NULL DEFAULT 0,
-  created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
-  updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
-);
-
-ALTER TABLE users ADD CONSTRAINT mentions_count CHECK (mentions >= 0);
-ALTER TABLE users ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
-
-
--- Tweets
-CREATE TABLE tweets (
-  id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
-  user_id   uuid NOT NULL,
-  post      text NOT NULL,
-  mentions  text[] NOT NULL DEFAULT '{}',
-  tags      text[] NOT NULL DEFAULT '{}',
-  created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
-  updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
-);
-
-ALTER TABLE tweets
-  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
-  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
-
-ALTER TABLE tweets ADD CONSTRAINT post_length CHECK (char_length(post) <= 140);
-
-
--- Tags
-CREATE TABLE tags (
-  id       uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
-  name     text NOT NULL UNIQUE,
-  tweets   integer NOT NULL DEFAULT 0,
-  created  timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
-  updated  timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
-);
-
-ALTER TABLE tags ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
-
-
--- Taggings
-CREATE TABLE taggings (
-  tag_id    uuid NOT NULL,
-  tweet_id  uuid NOT NULL,
-  PRIMARY KEY(tag_id, tweet_id)
-);
-
-ALTER TABLE taggings
-  ADD CONSTRAINT tag_fk FOREIGN KEY (tag_id) REFERENCES tags (id)
-  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
-
-ALTER TABLE taggings
-  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
-  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
-
-
--- Mentions
-CREATE TABLE mentions (
-  user_id   uuid NOT NULL,
-  tweet_id  uuid NOT NULL,
-  PRIMARY KEY(user_id, tweet_id)
-);
-
-ALTER TABLE mentions
-  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
-  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
-
-ALTER TABLE mentions
-  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
-  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
-
-
--- ############################################################################
--- # Functions
--- ############################################################################
-
+-- Parse tokens like tags and mentions from text
+--
+-- `content` - the text to parse tokens from
+-- `prefix`  - the character that tokens start with e.g. # or @
 CREATE FUNCTION parse_tokens(content text, prefix text)
   RETURNS text[] AS $$
     DECLARE
@@ -144,6 +35,7 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
     END;
   $$ LANGUAGE plpgsql STABLE;
 
+-- Returns the uuid of a random user record
 CREATE FUNCTION random_user_id()
   RETURNS uuid AS $$
     DECLARE
@@ -153,12 +45,6 @@ CREATE FUNCTION random_user_id()
       RETURN user_id;
     END;
   $$ LANGUAGE plpgsql VOLATILE;
-
-
--- ############################################################################
--- # Trigger functions
--- ############################################################################
-
 CREATE FUNCTION parse_mentions_from_post()
   RETURNS trigger AS $$
     BEGIN
@@ -302,16 +188,141 @@ CREATE FUNCTION delete_stale_tag()
       RETURN OLD;
     END;
   $$ LANGUAGE plpgsql;
+CREATE TABLE mentions (
+  user_id   uuid NOT NULL,
+  tweet_id  uuid NOT NULL,
+  PRIMARY KEY(user_id, tweet_id)
+);
+
+CREATE TABLE tags (
+  id       uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+  name     text NOT NULL UNIQUE,
+  tweets   integer NOT NULL DEFAULT 0,
+  created  timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
+  updated  timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
+);
+
+CREATE TABLE taggings (
+  tag_id    uuid NOT NULL,
+  tweet_id  uuid NOT NULL,
+  PRIMARY KEY(tag_id, tweet_id)
+);
+
+CREATE TABLE tweets (
+  id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+  user_id   uuid NOT NULL,
+  post      text NOT NULL,
+  mentions  text[] NOT NULL DEFAULT '{}',
+  tags      text[] NOT NULL DEFAULT '{}',
+  created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
+  updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
+);
+
+CREATE TABLE users (
+  id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+  username  text NOT NULL UNIQUE,
+  mentions  integer NOT NULL DEFAULT 0,
+  tweets    integer NOT NULL DEFAULT 0,
+  created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
+  updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
+);
+-- ############################################################################
+-- # mentions
+-- ############################################################################
+ALTER TABLE mentions
+  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE mentions
+  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 -- ############################################################################
--- # Triggers
+-- # tags
 -- ############################################################################
+ALTER TABLE tags ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
+
+
+-- ############################################################################
+-- # taggings
+-- ############################################################################
+ALTER TABLE taggings
+  ADD CONSTRAINT tag_fk FOREIGN KEY (tag_id) REFERENCES tags (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE taggings
+  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+-- ############################################################################
+-- # tweets
+-- ############################################################################
+ALTER TABLE tweets
+  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE tweets ADD CONSTRAINT post_length CHECK (char_length(post) <= 140);
+
+
+-- ############################################################################
+-- # users
+-- ############################################################################
+ALTER TABLE users ADD CONSTRAINT mentions_count CHECK (mentions >= 0);
+ALTER TABLE users ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
+-- ############################################################################
+-- # mentions
+-- ############################################################################
+CREATE TRIGGER update_user_mentions
+  AFTER INSERT OR DELETE ON mentions
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'mentions', 'user_id', 'user_id');
+
+
+-- ############################################################################
+-- # tags
+-- ############################################################################
+CREATE TRIGGER delete_stale_tags
+  AFTER UPDATE ON tags
+  FOR EACH ROW WHEN (NEW.tweets = 0)
+  EXECUTE PROCEDURE delete_stale_tag();
+
+
+-- ############################################################################
+-- # taggings
+-- ############################################################################
+CREATE TRIGGER update_tag_tweets
+  AFTER INSERT OR DELETE ON taggings
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('tags', 'tweets', 'tag_id', 'tag_id');
+
+
+-- ############################################################################
+-- # tweets
+-- ############################################################################
+CREATE TRIGGER update_user_tweets
+  AFTER INSERT OR DELETE ON tweets
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
+
+
 CREATE TRIGGER parse_mentions
   BEFORE INSERT OR UPDATE ON tweets
   FOR EACH ROW EXECUTE PROCEDURE parse_mentions_from_post();
 
-CREATE TRIGGER parse_tags
+CREATE TRIGGER create_mentions
+  AFTER INSERT OR UPDATE ON tweets
+  FOR EACH ROW
+  EXECUTE PROCEDURE create_new_mentions();
+
+CREATE TRIGGER delete_mentions
+  AFTER UPDATE ON tweets
+  FOR EACH ROW WHEN (NEW.mentions IS DISTINCT FROM OLD.mentions)
+  EXECUTE PROCEDURE delete_old_mentions();
+
+
+CREATE TRIGGER parse_taggings
   BEFORE INSERT OR UPDATE ON tweets
   FOR EACH ROW
   EXECUTE PROCEDURE parse_tags_from_post();
@@ -325,38 +336,6 @@ CREATE TRIGGER delete_taggings
   AFTER UPDATE ON tweets
   FOR EACH ROW WHEN (NEW.tags IS DISTINCT FROM OLD.tags)
   EXECUTE PROCEDURE delete_old_taggings();
-
-CREATE TRIGGER create_mentions
-  AFTER INSERT OR UPDATE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE create_new_mentions();
-
-CREATE TRIGGER delete_mentions
-  AFTER UPDATE ON tweets
-  FOR EACH ROW WHEN (NEW.mentions IS DISTINCT FROM OLD.mentions)
-  EXECUTE PROCEDURE delete_old_mentions();
-
-CREATE TRIGGER update_tag_tweets
-  AFTER INSERT OR DELETE ON taggings
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('tags', 'tweets', 'tag_id', 'tag_id');
-
-CREATE TRIGGER update_user_mentions
-  AFTER INSERT OR DELETE ON mentions
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'mentions', 'user_id', 'user_id');
-
-CREATE TRIGGER update_user_tweets
-  AFTER INSERT OR DELETE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
-
-CREATE TRIGGER delete_stale_tags
-  AFTER UPDATE ON tags
-  FOR EACH ROW WHEN (NEW.tweets = 0)
-  EXECUTE PROCEDURE delete_stale_tag();
-
-
 -- ############################################################################
 -- # Seed data
 -- ############################################################################

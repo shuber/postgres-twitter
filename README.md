@@ -12,7 +12,9 @@ This is an experimental build of a simple "twitter" application in Postgres.
 [splitscreen]: https://www.dropbox.com/s/220z2nd5qdizho0/Screenshot%202015-05-08%2023.55.47.png?dl=0
 
 
-## Ideas for Organization
+## Organization
+
+The `compile` executable combines all files under sql/ into `compiled.sql` or `development.sql`.
 
     bin/
       compile
@@ -27,6 +29,7 @@ This is an experimental build of a simple "twitter" application in Postgres.
       007_triggers.sql
       008_indexes.sql
       009_api.sql
+      999_development.sql
     test/
 
 
