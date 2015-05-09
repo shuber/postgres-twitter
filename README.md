@@ -2,9 +2,15 @@
 
 This is an experimental build of a simple "twitter" application in Postgres.
 
-## Useful VIM Plugins
 
-* https://github.com/vim-scripts/dbext.vim
+## Development
+
+* I'm using the [dbext] VIM plugin for [splitscreen] SQL and executed results.
+* I use the binding `<leader>see` to execute all statements in the buffer. (Sql Execute Everything)
+
+[dbext]: https://github.com/vim-scripts/dbext.vim
+[splitscreen]: https://www.dropbox.com/s/220z2nd5qdizho0/Screenshot%202015-05-08%2023.55.47.png?dl=0
+
 
 ## Sample Input
 
@@ -22,6 +28,7 @@ This is an experimental build of a simple "twitter" application in Postgres.
       ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane', random_user_id()),
       ('@steve hola!', random_user_id()),
       ('@bob I am! #imhungry #metoo #gimmefood #now', random_user_id());
+
 
 ## Sample Output
 
