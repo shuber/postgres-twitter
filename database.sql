@@ -27,6 +27,7 @@ DROP FUNCTION IF EXISTS parse_tags_from_post();
 DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP FUNCTION IF EXISTS create_new_taggings();
 DROP FUNCTION IF EXISTS update_tweets_count();
+DROP FUNCTION IF EXISTS random_user_id();
 
 DROP TABLE IF EXISTS "mentions";
 DROP TABLE IF EXISTS "taggings";
@@ -211,6 +212,16 @@ CREATE FUNCTION update_tweets_count()
     END;
   $$ LANGUAGE plpgsql;
 
+CREATE FUNCTION random_user_id()
+  RETURNS uuid AS $$
+    DECLARE
+      id uuid;
+    BEGIN
+      SELECT users.id FROM users ORDER BY random() LIMIT 1 INTO id;
+      RETURN id;
+    END;
+  $$ LANGUAGE plpgsql;
+
 
 -- ############################################################################
 -- # Triggers
@@ -243,12 +254,12 @@ INSERT INTO users (username) VALUES
   ('tom');
 
 INSERT INTO tweets (post, user_id) VALUES
-  ('My first tweet!', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
-  ('Another tweet with a tag! #hello-world', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
-  ('My second tweet! #hello-world #hello-world-again', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
-  ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
-  ('@steve hola!', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
-  ('@bob I am! #imhungry #metoo #gimmefood #now', (SELECT id FROM USERS ORDER BY random() LIMIT 1));
+  ('My first tweet!', random_user_id()),
+  ('Another tweet with a tag! #hello-world', random_user_id()),
+  ('My second tweet! #hello-world #hello-world-again', random_user_id()),
+  ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane', random_user_id()),
+  ('@steve hola!', random_user_id()),
+  ('@bob I am! #imhungry #metoo #gimmefood #now', random_user_id());
 
 
 -- ############################################################################
