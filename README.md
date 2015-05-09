@@ -12,6 +12,20 @@ This is an experimental build of a simple "twitter" application in Postgres.
 [splitscreen]: https://www.dropbox.com/s/220z2nd5qdizho0/Screenshot%202015-05-08%2023.55.47.png?dl=0
 
 
+## Ideas for Organization
+
+    000_development.sql
+    001_schemas.sql
+    002_extensions.sql
+    003_functions.sql
+    004_trigger_functions.sql
+    005_tables.sql
+    006_constraints.sql
+    007_triggers.sql
+    008_indexes.sql
+    009_api.sql
+
+
 ## Sample Input
 
     INSERT INTO users (username) VALUES
