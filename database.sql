@@ -217,37 +217,30 @@ CREATE FUNCTION counter_cache()
       increment integer;
       incrementor text;
 
-      record_identifier text;
-      column_identifier text;
+      record record;
     BEGIN
-      table_name := TG_ARGV[0];
-      column_name := TG_ARGV[1];
-      foreign_key_name := TG_ARGV[2];
-
-      IF TG_ARGV[3] IS NULL THEN
-        id_name := 'id';
-      ELSE
-        id_name := TG_ARGV[3];
-      END IF;
-
-      record_identifier := '(' || quote_literal(NEW) || '::' || TG_RELID::regclass || ')';
-      column_identifier := quote_ident(foreign_key_name);
-
-      EXECUTE 'SELECT ' || record_identifier || '.' || column_identifier
-      INTO foreign_key;
+      table_name := quote_ident(TG_ARGV[0]);
+      column_name := quote_ident(TG_ARGV[1]);
+      foreign_key_name := quote_ident(TG_ARGV[2]);
+      id_name := quote_ident(TG_ARGV[3]);
 
       IF TG_OP = 'INSERT' THEN
+        record := NEW;
         increment := 1;
       ELSE
+        record := OLD;
         increment := -1;
       END IF;
 
-      incrementor := column_name || ' = ' || column_name || ' + ' || increment;
+      EXECUTE 'SELECT ($1).' || quote_ident(foreign_key_name)
+      INTO foreign_key
+      USING record;
 
+      incrementor := column_name || ' = ' || column_name || ' + ' || increment;
       EXECUTE 'UPDATE ' || table_name || ' SET ' || incrementor || ' WHERE id = $1'
       USING foreign_key;
 
-      RETURN NEW;
+      RETURN record;
     END;
   $$ LANGUAGE plpgsql;
 
@@ -312,7 +305,7 @@ CREATE TRIGGER update_user_mentions
 
 CREATE TRIGGER update_user_tweets
   AFTER INSERT OR DELETE ON tweets
-  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id');
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
 
 
 -- ############################################################################
@@ -337,6 +330,14 @@ INSERT INTO tweets (post, user_id) VALUES
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
+DELETE FROM tweets
+WHERE id IN (
+  SELECT t.id
+  FROM tweets t
+  ORDER BY random()
+  LIMIT 1
+);
+
 SELECT id, username, mentions, tweets FROM users;
 SELECT * FROM mentions;
 SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
