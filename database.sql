@@ -22,6 +22,7 @@ DROP TRIGGER IF EXISTS parse_tags ON tweets;
 DROP TRIGGER IF EXISTS create_taggings ON tweets;
 DROP TRIGGER IF EXISTS create_mentions ON tweets;
 DROP TRIGGER IF EXISTS update_tweets ON taggings;
+DROP TRIGGER IF EXISTS update_mentions ON mentions;
 
 DROP FUNCTION IF EXISTS parse_mentions_from_post();
 DROP FUNCTION IF EXISTS parse_tags_from_post();
@@ -29,6 +30,7 @@ DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP FUNCTION IF EXISTS create_new_taggings();
 DROP FUNCTION IF EXISTS create_new_mentions();
 DROP FUNCTION IF EXISTS update_tweets_count();
+DROP FUNCTION IF EXISTS update_mentions_count();
 DROP FUNCTION IF EXISTS random_user_id();
 
 DROP TABLE IF EXISTS "mentions";
@@ -62,9 +64,12 @@ CREATE EXTENSION "uuid-ossp";
 CREATE TABLE users (
   id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   username  text NOT NULL UNIQUE,
+  mentions  integer NOT NULL DEFAULT 0,
   created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
   updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
 );
+
+ALTER TABLE users ADD CONSTRAINT mentions_count CHECK (mentions >= 0);
 
 
 -- Tweets
@@ -215,6 +220,23 @@ CREATE FUNCTION update_tweets_count()
     END;
   $$ LANGUAGE plpgsql;
 
+CREATE FUNCTION update_mentions_count()
+  RETURNS trigger AS $$
+    DECLARE
+      increment integer;
+    BEGIN
+      IF TG_OP = 'INSERT' THEN
+        increment := 1;
+      ELSE
+        increment := -1;
+      END IF;
+
+      UPDATE users SET mentions = mentions + increment WHERE id = NEW.user_id;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
 CREATE FUNCTION create_new_mentions()
   RETURNS trigger AS $$
     DECLARE
@@ -270,6 +292,10 @@ CREATE TRIGGER update_tweets
   AFTER INSERT OR DELETE ON taggings
   FOR EACH ROW EXECUTE PROCEDURE update_tweets_count();
 
+CREATE TRIGGER update_mentions
+  AFTER INSERT OR DELETE ON mentions
+  FOR EACH ROW EXECUTE PROCEDURE update_mentions_count();
+
 
 -- ############################################################################
 -- # Seed data
@@ -293,8 +319,8 @@ INSERT INTO tweets (post, user_id) VALUES
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
-SELECT id, username FROM users;
+SELECT id, username, mentions FROM users;
 SELECT * FROM mentions;
-SELECT username, post, mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
+SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
 SELECT * FROM taggings;
 SELECT name, tweets FROM tags;
