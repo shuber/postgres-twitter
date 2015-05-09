@@ -19,6 +19,7 @@
 -- ############################################################################
 DROP TRIGGER IF EXISTS parse_hashtags ON tweets;
 DROP FUNCTION IF EXISTS parse_hashtags_from_post();
+DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP TABLE IF EXISTS "taggings";
 DROP TABLE IF EXISTS "tags";
 DROP TABLE IF EXISTS "tweets";
@@ -85,19 +86,32 @@ ALTER TABLE taggings
 -- ############################################################################
 -- # Functions
 -- ############################################################################
-CREATE FUNCTION parse_hashtags_from_post()
-  RETURNS trigger AS $$
+CREATE FUNCTION parse_tokens(content text, prefix text)
+  RETURNS text[] AS $$
     DECLARE
+      regex text;
+      matches text;
       subquery text;
       captures text;
+      tokens text[];
     BEGIN
-      subquery := '(SELECT regexp_matches($1, $2, $3) as captures) as matches';
+      regex := prefix || '(\S+)';
+      matches := 'regexp_matches($1, $2, $3) as captures';
+      subquery := '(SELECT ' || matches || ' ORDER BY captures) as matches';
       captures := 'array_agg(matches.captures[1])';
 
       EXECUTE 'SELECT ' || captures || ' FROM ' || subquery
-      INTO NEW.hashtags
-      USING LOWER(NEW.post), '#(\S+)', 'g';
+      INTO tokens
+      USING content, regex, 'g';
 
+      RETURN tokens;
+    END;
+  $$ LANGUAGE plpgsql;
+
+CREATE FUNCTION parse_hashtags_from_post()
+  RETURNS trigger AS $$
+    BEGIN
+      NEW.hashtags = parse_tokens(NEW.post, '#');
       RETURN NEW;
     END;
   $$ LANGUAGE plpgsql;
@@ -127,5 +141,3 @@ INSERT INTO tweets (post) VALUES
 SELECT * FROM tweets;
 SELECT * FROM taggings;
 SELECT * FROM tags;
-
-SELECT (regexp_matches(post, '#(\S+)', 'g'))[1] from tweets;
