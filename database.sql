@@ -20,17 +20,19 @@
 DROP TRIGGER IF EXISTS parse_mentions ON tweets;
 DROP TRIGGER IF EXISTS parse_tags ON tweets;
 DROP TRIGGER IF EXISTS create_taggings ON tweets;
-DROP TRIGGER IF EXISTS tweets_counter_cache ON taggings;
+DROP TRIGGER IF EXISTS update_tweets ON taggings;
 
 DROP FUNCTION IF EXISTS parse_mentions_from_post();
 DROP FUNCTION IF EXISTS parse_tags_from_post();
 DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP FUNCTION IF EXISTS create_new_taggings();
-DROP FUNCTION IF EXISTS update_tweets_counter_cache();
+DROP FUNCTION IF EXISTS update_tweets_count();
 
+DROP TABLE IF EXISTS "mentions";
 DROP TABLE IF EXISTS "taggings";
 DROP TABLE IF EXISTS "tags";
 DROP TABLE IF EXISTS "tweets";
+DROP TABLE IF EXISTS "users";
 
 DROP EXTENSION IF EXISTS "uuid-ossp";
 
@@ -53,15 +55,29 @@ CREATE EXTENSION "uuid-ossp";
 -- # Tables
 -- ############################################################################
 
+-- Users
+CREATE TABLE users (
+  id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+  username  text NOT NULL UNIQUE,
+  created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
+  updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
+);
+
+
 -- Tweets
 CREATE TABLE tweets (
   id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+  user_id   uuid NOT NULL,
   post      text NOT NULL,
   mentions  text[] NOT NULL DEFAULT '{}',
   tags      text[] NOT NULL DEFAULT '{}',
   created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
   updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
 );
+
+ALTER TABLE tweets
+  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
 
 ALTER TABLE tweets ADD CONSTRAINT post_length CHECK (char_length(post) <= 140);
 
@@ -90,6 +106,21 @@ ALTER TABLE taggings
   MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
 
 ALTER TABLE taggings
+  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+-- Mentions
+CREATE TABLE mentions (
+  user_id   uuid NOT NULL,
+  tweet_id  uuid NOT NULL,
+  PRIMARY KEY(user_id, tweet_id)
+);
+
+ALTER TABLE mentions
+  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE mentions
   ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
   MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
 
@@ -163,7 +194,7 @@ CREATE FUNCTION create_new_taggings()
     END;
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION update_tweets_counter_cache()
+CREATE FUNCTION update_tweets_count()
   RETURNS trigger AS $$
     DECLARE
       increment integer;
@@ -196,26 +227,34 @@ CREATE TRIGGER create_taggings
   AFTER INSERT OR UPDATE ON tweets
   FOR EACH ROW EXECUTE PROCEDURE create_new_taggings();
 
-CREATE TRIGGER tweets_counter_cache
+CREATE TRIGGER update_tweets
   AFTER INSERT OR DELETE ON taggings
-  FOR EACH ROW EXECUTE PROCEDURE update_tweets_counter_cache();
+  FOR EACH ROW EXECUTE PROCEDURE update_tweets_count();
 
 
 -- ############################################################################
 -- # Seed data
 -- ############################################################################
-INSERT INTO tweets (post) VALUES
-  ('My first tweet!'),
-  ('Another tweet with a tag! #hello-world'),
-  ('My second tweet! #hello-world #hello-world-again'),
-  ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane'),
-  ('@steve hola!'),
-  ('@bob I am! #imhungry #metoo #gimmefood #now');
+INSERT INTO users (username) VALUES
+  ('bob'),
+  ('doug'),
+  ('jane'),
+  ('seve'),
+  ('tom');
+
+INSERT INTO tweets (post, user_id) VALUES
+  ('My first tweet!', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
+  ('Another tweet with a tag! #hello-world', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
+  ('My second tweet! #hello-world #hello-world-again', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
+  ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
+  ('@steve hola!', (SELECT id FROM USERS ORDER BY random() LIMIT 1)),
+  ('@bob I am! #imhungry #metoo #gimmefood #now', (SELECT id FROM USERS ORDER BY random() LIMIT 1));
 
 
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
-SELECT post, mentions, tags FROM tweets;
+SELECT id, username FROM users;
+SELECT username, post, mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
 SELECT * FROM taggings;
 SELECT name, tweets FROM tags;
