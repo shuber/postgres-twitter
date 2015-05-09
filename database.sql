@@ -54,7 +54,6 @@ CREATE TABLE tweets (
 ALTER TABLE tweets ADD CONSTRAINT post_length CHECK (char_length(post) <= 140);
 
 
-
 -- Tags
 CREATE TABLE tags (
   id       uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
@@ -93,12 +92,10 @@ CREATE FUNCTION parse_hashtags_from_post()
       tags text[];
     BEGIN
       post := lower(NEW.post);
-      tags := ARRAY['one', 'two', 'three'];
-      -- tags := regexp_matches(post, '#(\S+)', 'g');
 
-      -- EXECUTE 'SELECT regexp_matches($1, $2, $3)'
-      -- INTO tags
-      -- USING post, '#(\S+)', 'g';
+      EXECUTE 'SELECT array_agg(t.match[1]) FROM (SELECT regexp_matches($1, $2, $3) as match) as t'
+      INTO tags
+      USING post, '#(\S+)', 'g';
 
       NEW.hashtags := tags;
 
@@ -132,4 +129,4 @@ SELECT * FROM tweets;
 SELECT * FROM taggings;
 SELECT * FROM tags;
 
-SELECT regexp_matches(post, '#(\S+)', 'g') from tweets;
+SELECT (regexp_matches(post, '#(\S+)', 'g'))[1] from tweets;
