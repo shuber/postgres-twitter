@@ -17,8 +17,10 @@
 -- ############################################################################
 -- # Drop everything in reverse (for development)                        DANGER
 -- ############################################################################
-DROP TRIGGER IF EXISTS parse_hashtags ON tweets;
-DROP FUNCTION IF EXISTS parse_hashtags_from_post();
+DROP TRIGGER IF EXISTS parse_mentions ON tweets;
+DROP TRIGGER IF EXISTS parse_tags ON tweets;
+DROP FUNCTION IF EXISTS parse_mentions_from_post();
+DROP FUNCTION IF EXISTS parse_tags_from_post();
 DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP TABLE IF EXISTS "taggings";
 DROP TABLE IF EXISTS "tags";
@@ -47,7 +49,8 @@ CREATE EXTENSION "uuid-ossp";
 CREATE TABLE tweets (
   id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   post      text NOT NULL,
-  hashtags  text[] NOT NULL DEFAULT '{}',
+  mentions  text[] NOT NULL DEFAULT '{}',
+  tags      text[] NOT NULL DEFAULT '{}',
   created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
   updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
 );
@@ -102,16 +105,28 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
 
       EXECUTE 'SELECT ' || captures || ' FROM ' || subquery
       INTO tokens
-      USING content, regex, 'g';
+      USING LOWER(content), regex, 'g';
+
+      IF tokens IS NULL THEN
+        tokens = '{}';
+      END IF;
 
       RETURN tokens;
     END;
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION parse_hashtags_from_post()
+CREATE FUNCTION parse_mentions_from_post()
   RETURNS trigger AS $$
     BEGIN
-      NEW.hashtags = parse_tokens(NEW.post, '#');
+      NEW.mentions = parse_tokens(NEW.post, '@');
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
+CREATE FUNCTION parse_tags_from_post()
+  RETURNS trigger AS $$
+    BEGIN
+      NEW.tags = parse_tokens(NEW.post, '#');
       RETURN NEW;
     END;
   $$ LANGUAGE plpgsql;
@@ -120,9 +135,13 @@ CREATE FUNCTION parse_hashtags_from_post()
 -- ############################################################################
 -- # Triggers
 -- ############################################################################
-CREATE TRIGGER parse_hashtags
+CREATE TRIGGER parse_mentions
   BEFORE INSERT OR UPDATE ON tweets
-  FOR EACH ROW EXECUTE PROCEDURE parse_hashtags_from_post();
+  FOR EACH ROW EXECUTE PROCEDURE parse_mentions_from_post();
+
+CREATE TRIGGER parse_tags
+  BEFORE INSERT OR UPDATE ON tweets
+  FOR EACH ROW EXECUTE PROCEDURE parse_tags_from_post();
 
 
 -- ############################################################################
@@ -131,8 +150,8 @@ CREATE TRIGGER parse_hashtags
 INSERT INTO tweets (post) VALUES
   ('My first tweet! #hello-world'),
   ('My second tweet! #hello-world #hello-world-again'),
-  ('Is anyone else hungry? #imHUNGRY #gimmefood'),
-  ('I am! #imhungry #metoo #gimmefood #now');
+  ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane'),
+  ('@bob I am! #imhungry #metoo #gimmefood #now');
 
 
 -- ############################################################################
