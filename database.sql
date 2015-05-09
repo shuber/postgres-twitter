@@ -21,16 +21,18 @@ DROP TRIGGER IF EXISTS parse_mentions ON tweets;
 DROP TRIGGER IF EXISTS parse_tags ON tweets;
 DROP TRIGGER IF EXISTS create_taggings ON tweets;
 DROP TRIGGER IF EXISTS create_mentions ON tweets;
-DROP TRIGGER IF EXISTS update_tweets ON taggings;
-DROP TRIGGER IF EXISTS update_mentions ON mentions;
+DROP TRIGGER IF EXISTS update_tag_tweets ON taggings;
+DROP TRIGGER IF EXISTS update_user_mentions ON mentions;
+DROP TRIGGER IF EXISTS update_user_tweets ON tweets;
 
 DROP FUNCTION IF EXISTS parse_mentions_from_post();
 DROP FUNCTION IF EXISTS parse_tags_from_post();
 DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP FUNCTION IF EXISTS create_new_taggings();
 DROP FUNCTION IF EXISTS create_new_mentions();
-DROP FUNCTION IF EXISTS update_tweets_count();
-DROP FUNCTION IF EXISTS update_mentions_count();
+DROP FUNCTION IF EXISTS update_tag_tweets_count();
+DROP FUNCTION IF EXISTS update_user_mentions_count();
+DROP FUNCTION IF EXISTS update_user_tweets_count();
 DROP FUNCTION IF EXISTS random_user_id();
 
 DROP TABLE IF EXISTS "mentions";
@@ -163,7 +165,7 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
 
       RETURN tokens;
     END;
-  $$ LANGUAGE plpgsql;
+  $$ LANGUAGE plpgsql STABLE;
 
 CREATE FUNCTION parse_mentions_from_post()
   RETURNS trigger AS $$
@@ -205,7 +207,7 @@ CREATE FUNCTION create_new_taggings()
     END;
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION update_tweets_count()
+CREATE FUNCTION update_tag_tweets_count()
   RETURNS trigger AS $$
     DECLARE
       increment integer;
@@ -222,7 +224,7 @@ CREATE FUNCTION update_tweets_count()
     END;
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION update_mentions_count()
+CREATE FUNCTION update_user_mentions_count()
   RETURNS trigger AS $$
     DECLARE
       increment integer;
@@ -234,6 +236,23 @@ CREATE FUNCTION update_mentions_count()
       END IF;
 
       UPDATE users SET mentions = mentions + increment WHERE id = NEW.user_id;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
+CREATE FUNCTION update_user_tweets_count()
+  RETURNS trigger AS $$
+    DECLARE
+      increment integer;
+    BEGIN
+      IF TG_OP = 'INSERT' THEN
+        increment := 1;
+      ELSE
+        increment := -1;
+      END IF;
+
+      UPDATE users SET tweets = tweets + increment WHERE id = NEW.user_id;
 
       RETURN NEW;
     END;
@@ -268,7 +287,7 @@ CREATE FUNCTION random_user_id()
       SELECT id FROM users ORDER BY random() LIMIT 1 INTO user_id;
       RETURN user_id;
     END;
-  $$ LANGUAGE plpgsql;
+  $$ LANGUAGE plpgsql VOLATILE;
 
 
 -- ############################################################################
@@ -290,13 +309,17 @@ CREATE TRIGGER create_mentions
   AFTER INSERT OR UPDATE ON tweets
   FOR EACH ROW EXECUTE PROCEDURE create_new_mentions();
 
-CREATE TRIGGER update_tweets
+CREATE TRIGGER update_tag_tweets
   AFTER INSERT OR DELETE ON taggings
-  FOR EACH ROW EXECUTE PROCEDURE update_tweets_count();
+  FOR EACH ROW EXECUTE PROCEDURE update_tag_tweets_count();
 
-CREATE TRIGGER update_mentions
+CREATE TRIGGER update_user_mentions
   AFTER INSERT OR DELETE ON mentions
-  FOR EACH ROW EXECUTE PROCEDURE update_mentions_count();
+  FOR EACH ROW EXECUTE PROCEDURE update_user_mentions_count();
+
+CREATE TRIGGER update_user_tweets
+  AFTER INSERT OR DELETE ON tweets
+  FOR EACH ROW EXECUTE PROCEDURE update_user_tweets_count();
 
 
 -- ############################################################################
@@ -325,4 +348,4 @@ SELECT id, username, mentions, tweets FROM users;
 SELECT * FROM mentions;
 SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
 SELECT * FROM taggings;
-SELECT name, tweets FROM tags;
+SELECT id, name, tweets FROM tags;
