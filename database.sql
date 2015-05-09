@@ -19,13 +19,19 @@
 -- ############################################################################
 DROP TRIGGER IF EXISTS parse_mentions ON tweets;
 DROP TRIGGER IF EXISTS parse_tags ON tweets;
+DROP TRIGGER IF EXISTS create_taggings ON tweets;
+
 DROP FUNCTION IF EXISTS parse_mentions_from_post();
 DROP FUNCTION IF EXISTS parse_tags_from_post();
 DROP FUNCTION IF EXISTS parse_tokens(text, text);
+DROP FUNCTION IF EXISTS create_new_taggings();
+
 DROP TABLE IF EXISTS "taggings";
 DROP TABLE IF EXISTS "tags";
 DROP TABLE IF EXISTS "tweets";
+
 DROP EXTENSION IF EXISTS "uuid-ossp";
+
 DROP SCHEMA IF EXISTS "public";
 
 
@@ -131,6 +137,30 @@ CREATE FUNCTION parse_tags_from_post()
     END;
   $$ LANGUAGE plpgsql;
 
+CREATE FUNCTION create_new_taggings()
+  RETURNS trigger AS $$
+    DECLARE
+      tag text;
+      id uuid;
+    BEGIN
+      FOREACH tag IN ARRAY NEW.tags LOOP
+        BEGIN
+          tag := LOWER(tag);
+          INSERT INTO tags (name) VALUES (tag);
+        EXCEPTION WHEN unique_violation THEN
+        END;
+
+        BEGIN
+          EXECUTE 'SELECT id FROM tags WHERE name = $1' INTO id USING tag;
+          INSERT INTO taggings (tag_id, tweet_id) VALUES (id, NEW.id);
+        EXCEPTION WHEN unique_violation THEN
+        END;
+      END LOOP;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
 
 -- ############################################################################
 -- # Triggers
@@ -143,20 +173,26 @@ CREATE TRIGGER parse_tags
   BEFORE INSERT OR UPDATE ON tweets
   FOR EACH ROW EXECUTE PROCEDURE parse_tags_from_post();
 
+CREATE TRIGGER create_taggings
+  AFTER INSERT OR UPDATE ON tweets
+  FOR EACH ROW EXECUTE PROCEDURE create_new_taggings();
+
 
 -- ############################################################################
 -- # Seed data
 -- ############################################################################
 INSERT INTO tweets (post) VALUES
-  ('My first tweet! #hello-world'),
+  ('My first tweet!'),
+  ('Another tweet with a tag! #hello-world'),
   ('My second tweet! #hello-world #hello-world-again'),
   ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane'),
+  ('@steve hola!'),
   ('@bob I am! #imhungry #metoo #gimmefood #now');
 
 
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
-SELECT * FROM tweets;
+SELECT post, mentions, tags FROM tweets;
 SELECT * FROM taggings;
-SELECT * FROM tags;
+SELECT name, tweets FROM tags;
