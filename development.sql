@@ -46,7 +46,7 @@ CREATE FUNCTION random_user_id()
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 -- ############################################################################
--- # tweets
+-- # tags
 -- ############################################################################
 
 CREATE FUNCTION delete_stale_tag()
@@ -78,10 +78,13 @@ CREATE FUNCTION create_new_mentions()
     BEGIN
       FOREACH username IN ARRAY NEW.mentions LOOP
         BEGIN
-          EXECUTE 'SELECT id FROM users WHERE username = $1' INTO user_id USING LOWER(username);
+          EXECUTE 'SELECT id FROM users WHERE username = $1'
+          INTO user_id
+          USING LOWER(username);
 
           IF user_id IS NOT NULL THEN
-            INSERT INTO mentions (user_id, tweet_id) VALUES (user_id, NEW.id);
+            INSERT INTO mentions (user_id, tweet_id)
+            VALUES (user_id, NEW.id);
           END IF;
         EXCEPTION WHEN unique_violation THEN
         END;
@@ -133,8 +136,12 @@ CREATE FUNCTION create_new_taggings()
         END;
 
         BEGIN
-          EXECUTE 'SELECT id FROM tags WHERE name = $1' INTO user_id USING tag;
-          INSERT INTO taggings (tag_id, tweet_id) VALUES (user_id, NEW.id);
+          EXECUTE 'SELECT id FROM tags WHERE name = $1'
+          INTO user_id
+          USING tag;
+
+          INSERT INTO taggings (tag_id, tweet_id)
+          VALUES (user_id, NEW.id);
         EXCEPTION WHEN unique_violation THEN
         END;
       END LOOP;
