@@ -271,6 +271,22 @@ ALTER TABLE tweets ADD CONSTRAINT post_length CHECK (char_length(post) <= 140);
 ALTER TABLE users ADD CONSTRAINT mentions_count CHECK (mentions >= 0);
 ALTER TABLE users ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
 -- ############################################################################
+-- # tags
+-- ############################################################################
+CREATE UNIQUE INDEX ON tags (LOWER(name));
+
+
+-- ############################################################################
+-- # tweets
+-- ############################################################################
+CREATE INDEX ON tweets (user_id);
+
+
+-- ############################################################################
+-- # users
+-- ############################################################################
+CREATE UNIQUE INDEX ON users (LOWER(username));
+-- ############################################################################
 -- # mentions
 -- ############################################################################
 CREATE TRIGGER update_user_mentions
