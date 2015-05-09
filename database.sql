@@ -20,11 +20,13 @@
 DROP TRIGGER IF EXISTS parse_mentions ON tweets;
 DROP TRIGGER IF EXISTS parse_tags ON tweets;
 DROP TRIGGER IF EXISTS create_taggings ON tweets;
+DROP TRIGGER IF EXISTS tweets_counter_cache ON taggings;
 
 DROP FUNCTION IF EXISTS parse_mentions_from_post();
 DROP FUNCTION IF EXISTS parse_tags_from_post();
 DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP FUNCTION IF EXISTS create_new_taggings();
+DROP FUNCTION IF EXISTS update_tweets_counter_cache();
 
 DROP TABLE IF EXISTS "taggings";
 DROP TABLE IF EXISTS "tags";
@@ -161,6 +163,23 @@ CREATE FUNCTION create_new_taggings()
     END;
   $$ LANGUAGE plpgsql;
 
+CREATE FUNCTION update_tweets_counter_cache()
+  RETURNS trigger AS $$
+    DECLARE
+      increment integer;
+    BEGIN
+      IF TG_OP = 'INSERT' THEN
+        increment := 1;
+      ELSE
+        increment := -1;
+      END IF;
+
+      UPDATE tags SET tweets = tweets + increment WHERE id = NEW.tag_id;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
 
 -- ############################################################################
 -- # Triggers
@@ -176,6 +195,10 @@ CREATE TRIGGER parse_tags
 CREATE TRIGGER create_taggings
   AFTER INSERT OR UPDATE ON tweets
   FOR EACH ROW EXECUTE PROCEDURE create_new_taggings();
+
+CREATE TRIGGER tweets_counter_cache
+  AFTER INSERT OR DELETE ON taggings
+  FOR EACH ROW EXECUTE PROCEDURE update_tweets_counter_cache();
 
 
 -- ############################################################################
