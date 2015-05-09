@@ -33,6 +33,15 @@ The `compile` executable combines all files under sql/ into `compiled.sql` or `d
     test/
 
 
+## Todo
+
+* replies
+* retweets
+* favorites
+* followers
+* seed database from twitter stream
+
+
 ## Ideas for API
 
 #### The `random` schema
