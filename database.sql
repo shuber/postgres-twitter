@@ -30,10 +30,8 @@ DROP FUNCTION IF EXISTS parse_tags_from_post();
 DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP FUNCTION IF EXISTS create_new_taggings();
 DROP FUNCTION IF EXISTS create_new_mentions();
-DROP FUNCTION IF EXISTS update_tag_tweets_count();
-DROP FUNCTION IF EXISTS update_user_mentions_count();
-DROP FUNCTION IF EXISTS update_user_tweets_count();
 DROP FUNCTION IF EXISTS random_user_id();
+DROP FUNCTION IF EXISTS counter_cache();
 
 DROP TABLE IF EXISTS "mentions";
 DROP TABLE IF EXISTS "taggings";
@@ -207,52 +205,47 @@ CREATE FUNCTION create_new_taggings()
     END;
   $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION update_tag_tweets_count()
+CREATE FUNCTION counter_cache()
   RETURNS trigger AS $$
     DECLARE
+      table_name text;
+      column_name text;
+      foreign_key_name text;
+      id_name text;
+
+      foreign_key uuid;
       increment integer;
+      incrementor text;
+
+      record_identifier text;
+      column_identifier text;
     BEGIN
+      table_name := TG_ARGV[0];
+      column_name := TG_ARGV[1];
+      foreign_key_name := TG_ARGV[2];
+
+      IF TG_ARGV[3] IS NULL THEN
+        id_name := 'id';
+      ELSE
+        id_name := TG_ARGV[3];
+      END IF;
+
+      record_identifier := '(' || quote_literal(NEW) || '::' || TG_RELID::regclass || ')';
+      column_identifier := quote_ident(foreign_key_name);
+
+      EXECUTE 'SELECT ' || record_identifier || '.' || column_identifier
+      INTO foreign_key;
+
       IF TG_OP = 'INSERT' THEN
         increment := 1;
       ELSE
         increment := -1;
       END IF;
 
-      UPDATE tags SET tweets = tweets + increment WHERE id = NEW.tag_id;
+      incrementor := column_name || ' = ' || column_name || ' + ' || increment;
 
-      RETURN NEW;
-    END;
-  $$ LANGUAGE plpgsql;
-
-CREATE FUNCTION update_user_mentions_count()
-  RETURNS trigger AS $$
-    DECLARE
-      increment integer;
-    BEGIN
-      IF TG_OP = 'INSERT' THEN
-        increment := 1;
-      ELSE
-        increment := -1;
-      END IF;
-
-      UPDATE users SET mentions = mentions + increment WHERE id = NEW.user_id;
-
-      RETURN NEW;
-    END;
-  $$ LANGUAGE plpgsql;
-
-CREATE FUNCTION update_user_tweets_count()
-  RETURNS trigger AS $$
-    DECLARE
-      increment integer;
-    BEGIN
-      IF TG_OP = 'INSERT' THEN
-        increment := 1;
-      ELSE
-        increment := -1;
-      END IF;
-
-      UPDATE users SET tweets = tweets + increment WHERE id = NEW.user_id;
+      EXECUTE 'UPDATE ' || table_name || ' SET ' || incrementor || ' WHERE id = $1'
+      USING foreign_key;
 
       RETURN NEW;
     END;
@@ -311,15 +304,15 @@ CREATE TRIGGER create_mentions
 
 CREATE TRIGGER update_tag_tweets
   AFTER INSERT OR DELETE ON taggings
-  FOR EACH ROW EXECUTE PROCEDURE update_tag_tweets_count();
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tags', 'tweets', 'tag_id', 'tag_id');
 
 CREATE TRIGGER update_user_mentions
   AFTER INSERT OR DELETE ON mentions
-  FOR EACH ROW EXECUTE PROCEDURE update_user_mentions_count();
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'mentions', 'user_id', 'user_id');
 
 CREATE TRIGGER update_user_tweets
   AFTER INSERT OR DELETE ON tweets
-  FOR EACH ROW EXECUTE PROCEDURE update_user_tweets_count();
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id');
 
 
 -- ############################################################################
