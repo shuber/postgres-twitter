@@ -91,72 +91,108 @@ Public API for interacting with tags
       ('@steve hola!', random_user_id()),
       ('@bob I am! #imhungry #metoo #gimmefood #now', random_user_id());
 
+    INSERT INTO favorites (user_id, tweet_id)
+    SELECT id as user_id, random_tweet_id() as tweet_id
+    FROM users;
+
+    INSERT INTO followers (follower_id, user_id)
+    SELECT id as follower_id, random_user_id(id) as user_id
+    FROM users;
+
+    INSERT INTO replies (tweet_id, reply_id)
+    SELECT id as tweet_id, random_tweet_id(id) as reply_id
+    FROM tweets
+    LIMIT 2;
+
+    INSERT INTO retweets (tweet_id, retweet_id)
+    SELECT id as tweet_id, random_tweet_id(id) as retweet_id
+    FROM tweets
+    LIMIT 2;
+
+
+## Sample Queries
+
+    SELECT id, username, followers, following, favorites, mentions, tweets FROM users;
+    SELECT * FROM mentions;
+
+    -------------------------------------------------------------------------------
+
+    SELECT username, tweets.favorites, replies, retweets, tweets.mentions, tags
+    FROM tweets JOIN users on tweets.user_id = users.id;
+
+    DELETE FROM tweets
+    WHERE id IN (
+      SELECT t.id
+      FROM tweets t
+      ORDER BY random()
+      LIMIT 1
+    );
+
+    UPDATE tweets
+    SET post = 'replaced!'
+    WHERE id IN (
+      SELECT t.id
+      FROM tweets t
+      ORDER BY random()
+      LIMIT 1
+    );
+
+    SELECT username, tweets.favorites, replies, retweets, tweets.mentions, tags
+    FROM tweets JOIN users on tweets.user_id = users.id;
+
+    -------------------------------------------------------------------------------
+
+    SELECT * FROM taggings;
+    SELECT id, name, tweets FROM tags;
+
 
 ## Sample Output
 
-    Connection: T(PGSQL)  D(twitter)  U(shuber)   at 23:50
-
-
-    SELECT id, username, mentions, tweets FROM users;
-
-                      id                  | username | mentions | tweets 
-    --------------------------------------+----------+----------+--------
-     2a29bdc5-5b44-400a-95fb-99ea2eb0ea03 | jane     |        1 |      1
-     6e41bc72-2650-4eee-a5c4-f7974538c3c7 | steve    |        1 |      0
-     da26b582-a14c-4f68-aa4d-b05a47e7bdd9 | doug     |        0 |      1
-     49541427-180f-4d28-8ec9-6326cbaa071e | bob      |        1 |      3
-     2f5cc57b-1abc-48b7-8503-9d4d353eeeb3 | tom      |        1 |      1
+    Connection: T(PGSQL)  D(twitter)  U(shuber)   at 12:52
+                      id                  | username | followers | following | favorites | mentions | tweets 
+    --------------------------------------+----------+-----------+-----------+-----------+----------+--------
+     267ce9ac-c3df-4bf4-bbed-3aee28094a52 | doug     |         2 |         1 |         1 |        0 |      1
+     46c226b4-f26f-412c-a72f-9fe1b35da997 | bob      |         0 |         1 |         1 |        1 |      1
+     9d2860c9-a713-43e5-a384-c1b24b3d1c4d | tom      |         2 |         1 |         1 |        1 |      1
+     da1b62ea-c0bc-4f29-9d27-212144bc29c0 | jane     |         0 |         1 |         1 |        1 |      3
+     7bba5bea-d98b-4079-abea-fed05034dc6a | steve    |         1 |         1 |         1 |        1 |      0
     (5 rows)
-
-
-    SELECT * FROM mentions;
-
                    user_id                |               tweet_id               
     --------------------------------------+--------------------------------------
-     2a29bdc5-5b44-400a-95fb-99ea2eb0ea03 | 8b8746a1-a05a-41ea-9a26-a2a0bb31e401
-     2f5cc57b-1abc-48b7-8503-9d4d353eeeb3 | 8b8746a1-a05a-41ea-9a26-a2a0bb31e401
-     6e41bc72-2650-4eee-a5c4-f7974538c3c7 | 2d1fe013-0801-4721-825b-6d481f74753a
-     49541427-180f-4d28-8ec9-6326cbaa071e | 7225d9a4-025f-49e2-9c9c-126e601d9be7
+     da1b62ea-c0bc-4f29-9d27-212144bc29c0 | 2d872de0-46cc-44aa-9aec-015fd5291c72
+     9d2860c9-a713-43e5-a384-c1b24b3d1c4d | 2d872de0-46cc-44aa-9aec-015fd5291c72
+     7bba5bea-d98b-4079-abea-fed05034dc6a | 1bab8cad-9cac-473d-a689-fbc710aaaea6
+     46c226b4-f26f-412c-a72f-9fe1b35da997 | 3bc21b9d-c778-4c64-84b8-798fd65072d8
     (4 rows)
-
-
-    SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
-
-     username |                          post                          |  mentions  |              tags               
-    ----------+--------------------------------------------------------+------------+---------------------------------
-     jane     | My first tweet!                                        | {}         | {}
-     bob      | Another tweet with a tag! #hello-world @missing        | {missing}  | {hello-world}
-     bob      | My second tweet! #hello-world #hello-world-again       | {}         | {hello-world,hello-world-again}
-     bob      | Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane | {jane,tom} | {gimmefood,imhungry}
-     doug     | @steve hola!                                           | {steve}    | {}
-     tom      | @bob I am! #imhungry #metoo #gimmefood #now            | {bob}      | {gimmefood,imhungry,metoo,now}
+     username | favorites | replies | retweets |  mentions  |              tags               
+    ----------+-----------+---------+----------+------------+---------------------------------
+     tom      |         1 |       0 |        0 | {}         | {hello-world,hello-world-again}
+     jane     |         2 |       0 |        0 | {bob}      | {gimmefood,imhungry,metoo,now}
+     doug     |         0 |       1 |        0 | {}         | {}
+     jane     |         0 |       1 |        0 | {steve}    | {}
+     jane     |         1 |       0 |        1 | {jane,tom} | {gimmefood,imhungry}
+     bob      |         1 |       0 |        1 | {missing}  | {hello-world}
     (6 rows)
-
-
-    SELECT * FROM taggings;
-
+     username | favorites | replies | retweets |  mentions  |              tags               
+    ----------+-----------+---------+----------+------------+---------------------------------
+     tom      |         1 |       0 |        0 | {}         | {hello-world,hello-world-again}
+     doug     |         0 |       1 |        0 | {}         | {}
+     jane     |         1 |       0 |        1 | {jane,tom} | {gimmefood,imhungry}
+     bob      |         1 |       0 |        1 | {missing}  | {hello-world}
+     jane     |         2 |       0 |        0 | {}         | {}
+    (5 rows)
                     tag_id                |               tweet_id               
     --------------------------------------+--------------------------------------
-     3198bf19-7baa-4ce4-9ea4-89a1da3ccded | 5c8b8520-8b2c-4cc0-97c7-b057ce45fa04
-     3198bf19-7baa-4ce4-9ea4-89a1da3ccded | ac92cb2c-d567-49f8-aea6-fbfe97b3bf3c
-     fbc26ab2-0b99-4e96-ab0f-87bcd50383e4 | ac92cb2c-d567-49f8-aea6-fbfe97b3bf3c
-     e2fdafb9-52a9-45e6-aed2-e8a69a7b17d1 | 8b8746a1-a05a-41ea-9a26-a2a0bb31e401
-     7d594e04-6153-4740-b7ec-1ce64505cc47 | 8b8746a1-a05a-41ea-9a26-a2a0bb31e401
-     e2fdafb9-52a9-45e6-aed2-e8a69a7b17d1 | 7225d9a4-025f-49e2-9c9c-126e601d9be7
-     7d594e04-6153-4740-b7ec-1ce64505cc47 | 7225d9a4-025f-49e2-9c9c-126e601d9be7
-     d9f07dbf-05d6-4891-b672-7ec2c7d99e58 | 7225d9a4-025f-49e2-9c9c-126e601d9be7
-     66a07dc0-e45e-43e1-a541-9e28e0a4dc58 | 7225d9a4-025f-49e2-9c9c-126e601d9be7
-    (9 rows)
-
-
-    SELECT id, name, tweets FROM tags;
-
+     579e5a0f-5835-46ac-aced-528f8cd6e913 | 1d572544-8a84-4053-aef5-238260be3fa3
+     579e5a0f-5835-46ac-aced-528f8cd6e913 | 37421d41-416e-463d-9ad5-b9570f9356e8
+     0d86a554-0db2-4f60-8833-3d6bd6ed58af | 37421d41-416e-463d-9ad5-b9570f9356e8
+     c2620f3c-5a5c-4fa5-88f4-f01e2e12173e | 2d872de0-46cc-44aa-9aec-015fd5291c72
+     3efbea1c-3002-4b87-917b-d3ead6483983 | 2d872de0-46cc-44aa-9aec-015fd5291c72
+    (5 rows)
                       id                  |       name        | tweets 
     --------------------------------------+-------------------+--------
-     3198bf19-7baa-4ce4-9ea4-89a1da3ccded | hello-world       |      2
-     fbc26ab2-0b99-4e96-ab0f-87bcd50383e4 | hello-world-again |      1
-     e2fdafb9-52a9-45e6-aed2-e8a69a7b17d1 | gimmefood         |      2
-     7d594e04-6153-4740-b7ec-1ce64505cc47 | imhungry          |      2
-     d9f07dbf-05d6-4891-b672-7ec2c7d99e58 | metoo             |      1
-     66a07dc0-e45e-43e1-a541-9e28e0a4dc58 | now               |      1
-    (6 rows)
+     579e5a0f-5835-46ac-aced-528f8cd6e913 | hello-world       |      2
+     0d86a554-0db2-4f60-8833-3d6bd6ed58af | hello-world-again |      1
+     c2620f3c-5a5c-4fa5-88f4-f01e2e12173e | gimmefood         |      1
+     3efbea1c-3002-4b87-917b-d3ead6483983 | imhungry          |      1
+    (4 rows)
