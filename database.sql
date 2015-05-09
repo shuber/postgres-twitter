@@ -17,37 +17,9 @@
 -- ############################################################################
 -- # Drop everything in reverse (for development)                        DANGER
 -- ############################################################################
-DROP TRIGGER IF EXISTS parse_mentions ON tweets;
-DROP TRIGGER IF EXISTS parse_tags ON tweets;
-DROP TRIGGER IF EXISTS create_taggings ON tweets;
-DROP TRIGGER IF EXISTS delete_taggings ON tweets;
-DROP TRIGGER IF EXISTS create_mentions ON tweets;
-DROP TRIGGER IF EXISTS delete_mentions ON tweets;
-DROP TRIGGER IF EXISTS update_tag_tweets ON taggings;
-DROP TRIGGER IF EXISTS update_user_mentions ON mentions;
-DROP TRIGGER IF EXISTS update_user_tweets ON tweets;
-DROP TRIGGER IF EXISTS delete_stale_tags ON tags;
-
-DROP FUNCTION IF EXISTS parse_mentions_from_post();
-DROP FUNCTION IF EXISTS parse_tags_from_post();
-DROP FUNCTION IF EXISTS parse_tokens(text, text);
-DROP FUNCTION IF EXISTS create_new_taggings();
-DROP FUNCTION IF EXISTS delete_old_taggings();
-DROP FUNCTION IF EXISTS create_new_mentions();
-DROP FUNCTION IF EXISTS delete_old_mentions();
-DROP FUNCTION IF EXISTS random_user_id();
-DROP FUNCTION IF EXISTS counter_cache();
-DROP FUNCTION IF EXISTS delete_stale_tag();
-
-DROP TABLE IF EXISTS "mentions";
-DROP TABLE IF EXISTS "taggings";
-DROP TABLE IF EXISTS "tags";
-DROP TABLE IF EXISTS "tweets";
-DROP TABLE IF EXISTS "users";
-
-DROP EXTENSION IF EXISTS "uuid-ossp";
-
-DROP SCHEMA IF EXISTS "public";
+SET client_min_messages TO WARNING;
+DROP SCHEMA "public" CASCADE;
+SET client_min_messages TO NOTICE;
 
 
 -- ############################################################################
