@@ -88,16 +88,15 @@ ALTER TABLE taggings
 CREATE FUNCTION parse_hashtags_from_post()
   RETURNS trigger AS $$
     DECLARE
-      post text;
-      tags text[];
+      subquery text;
+      captures text;
     BEGIN
-      post := lower(NEW.post);
+      subquery := '(SELECT regexp_matches($1, $2, $3) as captures) as matches';
+      captures := 'array_agg(matches.captures[1])';
 
-      EXECUTE 'SELECT array_agg(t.match[1]) FROM (SELECT regexp_matches($1, $2, $3) as match) as t'
-      INTO tags
-      USING post, '#(\S+)', 'g';
-
-      NEW.hashtags := tags;
+      EXECUTE 'SELECT ' || captures || ' FROM ' || subquery
+      INTO NEW.hashtags
+      USING LOWER(NEW.post), '#(\S+)', 'g';
 
       RETURN NEW;
     END;
