@@ -35,6 +35,19 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
     END;
   $$ LANGUAGE plpgsql STABLE;
 
+-------------------------------------------------------------------------------
+
+-- Returns the uuid of a random tweet record
+CREATE FUNCTION random_tweet_id()
+  RETURNS uuid AS $$
+    DECLARE
+      tweet_id uuid;
+    BEGIN
+      SELECT id FROM tweets ORDER BY random() LIMIT 1 INTO tweet_id;
+      RETURN tweet_id;
+    END;
+  $$ LANGUAGE plpgsql VOLATILE;
+
 -- Returns the uuid of a random user record
 CREATE FUNCTION random_user_id()
   RETURNS uuid AS $$
@@ -205,6 +218,12 @@ CREATE FUNCTION counter_cache()
       RETURN record;
     END;
   $$ LANGUAGE plpgsql;
+CREATE TABLE favorites (
+  user_id   uuid NOT NULL,
+  tweet_id  uuid NOT NULL,
+  PRIMARY KEY(user_id, tweet_id)
+);
+
 CREATE TABLE mentions (
   user_id   uuid NOT NULL,
   tweet_id  uuid NOT NULL,
@@ -226,23 +245,38 @@ CREATE TABLE taggings (
 );
 
 CREATE TABLE tweets (
-  id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
-  user_id   uuid NOT NULL,
-  post      text NOT NULL,
-  mentions  text[] NOT NULL DEFAULT '{}',
-  tags      text[] NOT NULL DEFAULT '{}',
-  created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
-  updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
+  id         uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+  user_id    uuid NOT NULL,
+  post       text NOT NULL,
+  favorites  integer NOT NULL DEFAULT 0,
+  mentions   text[] NOT NULL DEFAULT '{}',
+  tags       text[] NOT NULL DEFAULT '{}',
+  created    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
+  updated    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
 );
 
 CREATE TABLE users (
-  id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
-  username  text NOT NULL UNIQUE,
-  mentions  integer NOT NULL DEFAULT 0,
-  tweets    integer NOT NULL DEFAULT 0,
-  created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
-  updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
+  id         uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+  username   text NOT NULL UNIQUE,
+  favorites  integer NOT NULL DEFAULT 0,
+  mentions   integer NOT NULL DEFAULT 0,
+  tweets     integer NOT NULL DEFAULT 0,
+  created    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
+  updated    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
 );
+-- ############################################################################
+-- # favorites
+-- ############################################################################
+
+ALTER TABLE favorites
+  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE favorites
+  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
 -- ############################################################################
 -- # mentions
 -- ############################################################################
@@ -317,6 +351,21 @@ CREATE INDEX ON tweets (user_id);
 -- ############################################################################
 
 CREATE UNIQUE INDEX ON users (LOWER(username));
+-- ############################################################################
+-- # favorites
+-- ############################################################################
+
+CREATE TRIGGER update_tweet_favorites
+  AFTER INSERT OR DELETE ON favorites
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('tweets', 'favorites', 'tweet_id', 'tweet_id');
+
+CREATE TRIGGER update_user_favorites
+  AFTER INSERT OR DELETE ON favorites
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'favorites', 'user_id', 'user_id');
+
+
 -- ############################################################################
 -- # mentions
 -- ############################################################################
@@ -407,17 +456,21 @@ INSERT INTO tweets (post, user_id) VALUES
   ('@steve hola!', random_user_id()),
   ('@bob I am! #imhungry #metoo #gimmefood #now', random_user_id());
 
+INSERT INTO favorites (user_id, tweet_id)
+SELECT id as user_id, random_tweet_id() as tweet_id
+FROM users;
+
 
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
 
-SELECT id, username, mentions, tweets FROM users;
+SELECT id, username, favorites, mentions, tweets FROM users;
 SELECT * FROM mentions;
 
 -------------------------------------------------------------------------------
 
-SELECT username, post, tweets.mentions, tags
+SELECT username, post, tweets.favorites, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 DELETE FROM tweets
@@ -437,7 +490,7 @@ WHERE id IN (
   LIMIT 1
 );
 
-SELECT username, post, tweets.mentions, tags
+SELECT username, post, tweets.favorites, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 -------------------------------------------------------------------------------

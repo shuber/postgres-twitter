@@ -1,4 +1,19 @@
 -- ############################################################################
+-- # favorites
+-- ############################################################################
+
+CREATE TRIGGER update_tweet_favorites
+  AFTER INSERT OR DELETE ON favorites
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('tweets', 'favorites', 'tweet_id', 'tweet_id');
+
+CREATE TRIGGER update_user_favorites
+  AFTER INSERT OR DELETE ON favorites
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('users', 'favorites', 'user_id', 'user_id');
+
+
+-- ############################################################################
 -- # mentions
 -- ############################################################################
 

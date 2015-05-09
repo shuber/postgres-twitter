@@ -1,4 +1,17 @@
 -- ############################################################################
+-- # favorites
+-- ############################################################################
+
+ALTER TABLE favorites
+  ADD CONSTRAINT user_fk FOREIGN KEY (user_id) REFERENCES users (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE favorites
+  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+-- ############################################################################
 -- # mentions
 -- ############################################################################
 

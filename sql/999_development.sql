@@ -17,17 +17,21 @@ INSERT INTO tweets (post, user_id) VALUES
   ('@steve hola!', random_user_id()),
   ('@bob I am! #imhungry #metoo #gimmefood #now', random_user_id());
 
+INSERT INTO favorites (user_id, tweet_id)
+SELECT id as user_id, random_tweet_id() as tweet_id
+FROM users;
+
 
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
 
-SELECT id, username, mentions, tweets FROM users;
+SELECT id, username, favorites, mentions, tweets FROM users;
 SELECT * FROM mentions;
 
 -------------------------------------------------------------------------------
 
-SELECT username, post, tweets.mentions, tags
+SELECT username, post, tweets.favorites, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 DELETE FROM tweets
@@ -47,7 +51,7 @@ WHERE id IN (
   LIMIT 1
 );
 
-SELECT username, post, tweets.mentions, tags
+SELECT username, post, tweets.favorites, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 -------------------------------------------------------------------------------
