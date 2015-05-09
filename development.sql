@@ -37,18 +37,33 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
 
 -------------------------------------------------------------------------------
 
--- Returns the uuid of a random tweet record
 CREATE FUNCTION random_tweet_id()
   RETURNS uuid AS $$
     DECLARE
-      tweet_id uuid;
+      uuid uuid;
     BEGIN
-      SELECT id FROM tweets ORDER BY random() LIMIT 1 INTO tweet_id;
-      RETURN tweet_id;
+      uuid := uuid_generate_v4();
+      RETURN random_tweet_id(uuid);
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 
--- Returns the uuid of a random user record
+CREATE FUNCTION random_tweet_id(exclude uuid)
+  RETURNS uuid AS $$
+    DECLARE
+      uuid uuid;
+    BEGIN
+      SELECT id
+      FROM tweets
+      WHERE id != exclude
+      ORDER BY random()
+      LIMIT 1
+      INTO uuid;
+      RETURN uuid;
+    END;
+  $$ LANGUAGE plpgsql VOLATILE;
+
+-------------------------------------------------------------------------------
+
 CREATE FUNCTION random_user_id()
   RETURNS uuid AS $$
     DECLARE
@@ -240,9 +255,9 @@ CREATE TABLE favorites (
 );
 
 CREATE TABLE followers (
-  follower_id  uuid NOT NULL,
   user_id      uuid NOT NULL,
-  PRIMARY KEY(follower_id, user_id)
+  follower_id  uuid NOT NULL,
+  PRIMARY KEY(user_id, follower_id)
 );
 
 CREATE TABLE mentions (
@@ -265,11 +280,18 @@ CREATE TABLE taggings (
   PRIMARY KEY(tag_id, tweet_id)
 );
 
+CREATE TABLE retweets (
+  tweet_id    uuid NOT NULL,
+  retweet_id  uuid NOT NULL,
+  PRIMARY KEY(tweet_id, retweet_id)
+);
+
 CREATE TABLE tweets (
   id         uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   user_id    uuid NOT NULL,
   post       text NOT NULL,
   favorites  integer NOT NULL DEFAULT 0,
+  retweets   integer NOT NULL DEFAULT 0,
   mentions   text[] NOT NULL DEFAULT '{}',
   tags       text[] NOT NULL DEFAULT '{}',
   created    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
@@ -327,6 +349,19 @@ ALTER TABLE mentions
 
 ALTER TABLE mentions
   ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+-- ############################################################################
+-- # reweets
+-- ############################################################################
+
+ALTER TABLE retweets
+  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE retweets
+  ADD CONSTRAINT retweet_fk FOREIGN KEY (retweet_id) REFERENCES tweets (id)
   MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
 
 
@@ -432,6 +467,16 @@ CREATE TRIGGER update_user_mentions
 
 
 -- ############################################################################
+-- # reweets
+-- ############################################################################
+
+CREATE TRIGGER update_tweet_retweets
+  AFTER INSERT OR DELETE ON retweets
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('tweets', 'retweets', 'tweet_id', 'id');
+
+
+-- ############################################################################
 -- # tags
 -- ############################################################################
 
@@ -519,6 +564,11 @@ INSERT INTO followers (follower_id, user_id)
 SELECT id as follower_id, random_user_id(id) as user_id
 FROM users;
 
+INSERT INTO retweets (tweet_id, retweet_id)
+SELECT id as tweet_id, random_tweet_id(id) as retweet_id
+FROM tweets
+LIMIT 2;
+
 
 -- ############################################################################
 -- # Debug output
@@ -529,7 +579,7 @@ SELECT * FROM mentions;
 
 -------------------------------------------------------------------------------
 
-SELECT username, post, tweets.favorites, tweets.mentions, tags
+SELECT username, tweets.favorites, retweets, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 DELETE FROM tweets
@@ -549,7 +599,7 @@ WHERE id IN (
   LIMIT 1
 );
 
-SELECT username, post, tweets.favorites, tweets.mentions, tags
+SELECT username, tweets.favorites, retweets, tweets.mentions, tags
 FROM tweets JOIN users on tweets.user_id = users.id;
 
 -------------------------------------------------------------------------------

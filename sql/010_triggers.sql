@@ -39,6 +39,16 @@ CREATE TRIGGER update_user_mentions
 
 
 -- ############################################################################
+-- # reweets
+-- ############################################################################
+
+CREATE TRIGGER update_tweet_retweets
+  AFTER INSERT OR DELETE ON retweets
+  FOR EACH ROW
+  EXECUTE PROCEDURE counter_cache('tweets', 'retweets', 'tweet_id', 'id');
+
+
+-- ############################################################################
 -- # tags
 -- ############################################################################
 

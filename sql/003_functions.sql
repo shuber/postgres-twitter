@@ -30,18 +30,33 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
 
 -------------------------------------------------------------------------------
 
--- Returns the uuid of a random tweet record
 CREATE FUNCTION random_tweet_id()
   RETURNS uuid AS $$
     DECLARE
-      tweet_id uuid;
+      uuid uuid;
     BEGIN
-      SELECT id FROM tweets ORDER BY random() LIMIT 1 INTO tweet_id;
-      RETURN tweet_id;
+      uuid := uuid_generate_v4();
+      RETURN random_tweet_id(uuid);
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 
--- Returns the uuid of a random user record
+CREATE FUNCTION random_tweet_id(exclude uuid)
+  RETURNS uuid AS $$
+    DECLARE
+      uuid uuid;
+    BEGIN
+      SELECT id
+      FROM tweets
+      WHERE id != exclude
+      ORDER BY random()
+      LIMIT 1
+      INTO uuid;
+      RETURN uuid;
+    END;
+  $$ LANGUAGE plpgsql VOLATILE;
+
+-------------------------------------------------------------------------------
+
 CREATE FUNCTION random_user_id()
   RETURNS uuid AS $$
     DECLARE

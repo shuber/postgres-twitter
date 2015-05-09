@@ -5,9 +5,9 @@ CREATE TABLE favorites (
 );
 
 CREATE TABLE followers (
-  follower_id  uuid NOT NULL,
   user_id      uuid NOT NULL,
-  PRIMARY KEY(follower_id, user_id)
+  follower_id  uuid NOT NULL,
+  PRIMARY KEY(user_id, follower_id)
 );
 
 CREATE TABLE mentions (
@@ -30,11 +30,18 @@ CREATE TABLE taggings (
   PRIMARY KEY(tag_id, tweet_id)
 );
 
+CREATE TABLE retweets (
+  tweet_id    uuid NOT NULL,
+  retweet_id  uuid NOT NULL,
+  PRIMARY KEY(tweet_id, retweet_id)
+);
+
 CREATE TABLE tweets (
   id         uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   user_id    uuid NOT NULL,
   post       text NOT NULL,
   favorites  integer NOT NULL DEFAULT 0,
+  retweets   integer NOT NULL DEFAULT 0,
   mentions   text[] NOT NULL DEFAULT '{}',
   tags       text[] NOT NULL DEFAULT '{}',
   created    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,

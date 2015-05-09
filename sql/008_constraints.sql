@@ -42,6 +42,19 @@ ALTER TABLE mentions
 
 
 -- ############################################################################
+-- # reweets
+-- ############################################################################
+
+ALTER TABLE retweets
+  ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+ALTER TABLE retweets
+  ADD CONSTRAINT retweet_fk FOREIGN KEY (retweet_id) REFERENCES tweets (id)
+  MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+-- ############################################################################
 -- # tags
 -- ############################################################################
 
