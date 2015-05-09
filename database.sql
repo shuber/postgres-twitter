@@ -20,12 +20,14 @@
 DROP TRIGGER IF EXISTS parse_mentions ON tweets;
 DROP TRIGGER IF EXISTS parse_tags ON tweets;
 DROP TRIGGER IF EXISTS create_taggings ON tweets;
+DROP TRIGGER IF EXISTS create_mentions ON tweets;
 DROP TRIGGER IF EXISTS update_tweets ON taggings;
 
 DROP FUNCTION IF EXISTS parse_mentions_from_post();
 DROP FUNCTION IF EXISTS parse_tags_from_post();
 DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP FUNCTION IF EXISTS create_new_taggings();
+DROP FUNCTION IF EXISTS create_new_mentions();
 DROP FUNCTION IF EXISTS update_tweets_count();
 DROP FUNCTION IF EXISTS random_user_id();
 
@@ -110,6 +112,7 @@ ALTER TABLE taggings
   ADD CONSTRAINT tweet_fk FOREIGN KEY (tweet_id) REFERENCES tweets (id)
   MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
 
+
 -- Mentions
 CREATE TABLE mentions (
   user_id   uuid NOT NULL,
@@ -175,7 +178,7 @@ CREATE FUNCTION create_new_taggings()
   RETURNS trigger AS $$
     DECLARE
       tag text;
-      id uuid;
+      user_id uuid;
     BEGIN
       FOREACH tag IN ARRAY NEW.tags LOOP
         BEGIN
@@ -185,8 +188,8 @@ CREATE FUNCTION create_new_taggings()
         END;
 
         BEGIN
-          EXECUTE 'SELECT id FROM tags WHERE name = $1' INTO id USING tag;
-          INSERT INTO taggings (tag_id, tweet_id) VALUES (id, NEW.id);
+          EXECUTE 'SELECT id FROM tags WHERE name = $1' INTO user_id USING tag;
+          INSERT INTO taggings (tag_id, tweet_id) VALUES (user_id, NEW.id);
         EXCEPTION WHEN unique_violation THEN
         END;
       END LOOP;
@@ -212,13 +215,34 @@ CREATE FUNCTION update_tweets_count()
     END;
   $$ LANGUAGE plpgsql;
 
+CREATE FUNCTION create_new_mentions()
+  RETURNS trigger AS $$
+    DECLARE
+      username text;
+      user_id uuid;
+    BEGIN
+      FOREACH username IN ARRAY NEW.mentions LOOP
+        BEGIN
+          EXECUTE 'SELECT id FROM users WHERE username = $1' INTO user_id USING LOWER(username);
+
+          IF user_id IS NOT NULL THEN
+            INSERT INTO mentions (user_id, tweet_id) VALUES (user_id, NEW.id);
+          END IF;
+        EXCEPTION WHEN unique_violation THEN
+        END;
+      END LOOP;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
 CREATE FUNCTION random_user_id()
   RETURNS uuid AS $$
     DECLARE
-      id uuid;
+      user_id uuid;
     BEGIN
-      SELECT users.id FROM users ORDER BY random() LIMIT 1 INTO id;
-      RETURN id;
+      SELECT id FROM users ORDER BY random() LIMIT 1 INTO user_id;
+      RETURN user_id;
     END;
   $$ LANGUAGE plpgsql;
 
@@ -238,6 +262,10 @@ CREATE TRIGGER create_taggings
   AFTER INSERT OR UPDATE ON tweets
   FOR EACH ROW EXECUTE PROCEDURE create_new_taggings();
 
+CREATE TRIGGER create_mentions
+  AFTER INSERT OR UPDATE ON tweets
+  FOR EACH ROW EXECUTE PROCEDURE create_new_mentions();
+
 CREATE TRIGGER update_tweets
   AFTER INSERT OR DELETE ON taggings
   FOR EACH ROW EXECUTE PROCEDURE update_tweets_count();
@@ -250,12 +278,12 @@ INSERT INTO users (username) VALUES
   ('bob'),
   ('doug'),
   ('jane'),
-  ('seve'),
+  ('steve'),
   ('tom');
 
 INSERT INTO tweets (post, user_id) VALUES
   ('My first tweet!', random_user_id()),
-  ('Another tweet with a tag! #hello-world', random_user_id()),
+  ('Another tweet with a tag! #hello-world @missing', random_user_id()),
   ('My second tweet! #hello-world #hello-world-again', random_user_id()),
   ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane', random_user_id()),
   ('@steve hola!', random_user_id()),
@@ -266,6 +294,7 @@ INSERT INTO tweets (post, user_id) VALUES
 -- # Debug output
 -- ############################################################################
 SELECT id, username FROM users;
+SELECT * FROM mentions;
 SELECT username, post, mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
 SELECT * FROM taggings;
 SELECT name, tweets FROM tags;
