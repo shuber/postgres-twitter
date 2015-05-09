@@ -22,6 +22,7 @@ DROP TRIGGER IF EXISTS parse_tags ON tweets;
 DROP TRIGGER IF EXISTS create_taggings ON tweets;
 DROP TRIGGER IF EXISTS delete_taggings ON tweets;
 DROP TRIGGER IF EXISTS create_mentions ON tweets;
+DROP TRIGGER IF EXISTS delete_mentions ON tweets;
 DROP TRIGGER IF EXISTS update_tag_tweets ON taggings;
 DROP TRIGGER IF EXISTS update_user_mentions ON mentions;
 DROP TRIGGER IF EXISTS update_user_tweets ON tweets;
@@ -33,6 +34,7 @@ DROP FUNCTION IF EXISTS parse_tokens(text, text);
 DROP FUNCTION IF EXISTS create_new_taggings();
 DROP FUNCTION IF EXISTS delete_old_taggings();
 DROP FUNCTION IF EXISTS create_new_mentions();
+DROP FUNCTION IF EXISTS delete_old_mentions();
 DROP FUNCTION IF EXISTS random_user_id();
 DROP FUNCTION IF EXISTS counter_cache();
 DROP FUNCTION IF EXISTS delete_stale_tag();
@@ -233,7 +235,8 @@ CREATE FUNCTION delete_old_taggings()
       FOREACH tag IN ARRAY OLD.tags LOOP
         IF NOT NEW.tags @> ARRAY[tag] THEN
           DELETE FROM taggings USING tags
-          WHERE taggings.tweet_id = NEW.id
+          WHERE taggings.tag_id = tags.id
+          AND taggings.tweet_id = NEW.id
           AND tags.name = tag;
         END IF;
       END LOOP;
@@ -302,6 +305,24 @@ CREATE FUNCTION create_new_mentions()
     END;
   $$ LANGUAGE plpgsql;
 
+CREATE FUNCTION delete_old_mentions()
+  RETURNS trigger AS $$
+    DECLARE
+      mention text;
+    BEGIN
+      FOREACH mention IN ARRAY OLD.mentions LOOP
+        IF NOT NEW.mentions @> ARRAY[mention] THEN
+          DELETE FROM mentions USING users
+          WHERE mentions.user_id = users.id
+          AND mentions.tweet_id = NEW.id
+          AND users.username = mention;
+        END IF;
+      END LOOP;
+
+      RETURN NEW;
+    END;
+  $$ LANGUAGE plpgsql;
+
 CREATE FUNCTION delete_stale_tag()
   RETURNS trigger AS $$
     BEGIN
@@ -337,6 +358,11 @@ CREATE TRIGGER create_mentions
   AFTER INSERT OR UPDATE ON tweets
   FOR EACH ROW
   EXECUTE PROCEDURE create_new_mentions();
+
+CREATE TRIGGER delete_mentions
+  AFTER UPDATE ON tweets
+  FOR EACH ROW WHEN (NEW.mentions IS DISTINCT FROM OLD.mentions)
+  EXECUTE PROCEDURE delete_old_mentions();
 
 CREATE TRIGGER update_tag_tweets
   AFTER INSERT OR DELETE ON taggings
