@@ -24,11 +24,12 @@ The `compile` executable combines all files under sql/ into `compiled.sql` or `d
       002_extensions.sql
       003_functions.sql
       004_trigger_functions.sql
-      005_tables.sql
-      006_constraints.sql
-      007_triggers.sql
-      008_indexes.sql
-      009_api.sql
+      005_behaviors.sql
+      006_tables.sql
+      007_views.sql
+      008_constraints.sql
+      009_indexes.sql
+      010_triggers.sql
       999_development.sql
     test/
 
