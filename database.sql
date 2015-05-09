@@ -65,11 +65,13 @@ CREATE TABLE users (
   id        uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   username  text NOT NULL UNIQUE,
   mentions  integer NOT NULL DEFAULT 0,
+  tweets    integer NOT NULL DEFAULT 0,
   created   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
   updated   timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
 );
 
 ALTER TABLE users ADD CONSTRAINT mentions_count CHECK (mentions >= 0);
+ALTER TABLE users ADD CONSTRAINT tweets_count CHECK (tweets >= 0);
 
 
 -- Tweets
@@ -319,7 +321,7 @@ INSERT INTO tweets (post, user_id) VALUES
 -- ############################################################################
 -- # Debug output
 -- ############################################################################
-SELECT id, username, mentions FROM users;
+SELECT id, username, mentions, tweets FROM users;
 SELECT * FROM mentions;
 SELECT username, post, tweets.mentions, tags FROM tweets JOIN users on tweets.user_id = users.id;
 SELECT * FROM taggings;
