@@ -73,6 +73,17 @@ Public API for interacting with tags
 * `tags.listen(names text[])`
 * `tags.tweets(names text[])`
 
+Or maybe put everything under the `api` schema
+
+* `api.create_reply(tweet_id uuid, post text, user_id uuid)`
+* `api.create_retweet(tweet_id uuid, post text, user_id uuid)`
+* `api.create_tweet(post text, user_id uuid)`
+* `api.delete_tweet(tweet_id uuid)`
+* `api.favorite_tweet(tweet_id uuid, user_id uuid)`
+* `api.unfavorite_tweet(tweet_id uuid, user_id uuid)`
+* `api.follow_user(user_id uuid, follower_id uuid)`
+* `api.unfollow_user(user_id uuid, follower_id uuid)`
+
 
 ## Sample Input
 
