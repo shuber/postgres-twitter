@@ -2,7 +2,9 @@
 -- Silently drop everything in reverse (for development)
 SET client_min_messages TO WARNING;
 DROP SCHEMA "public" CASCADE;
+DROP SCHEMA "views" CASCADE;
 SET client_min_messages TO NOTICE;
+CREATE SCHEMA "views";
 CREATE SCHEMA "public";
 CREATE EXTENSION "uuid-ossp";
 -- Parse tokens like tags and mentions from text
@@ -316,6 +318,11 @@ CREATE TABLE users (
   created    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
   updated    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
 );
+CREATE VIEW views.retweets AS
+  SELECT r.tweet_id, t.*
+  FROM tweets AS t
+  INNER JOIN retweets AS r
+  ON t.id = r.retweet_id;
 -- ############################################################################
 -- # favorites
 -- ############################################################################
@@ -614,9 +621,6 @@ SELECT * FROM mentions;
 
 -------------------------------------------------------------------------------
 
-SELECT username, tweets.favorites, replies, retweets, tweets.mentions, tags
-FROM tweets JOIN users on tweets.user_id = users.id;
-
 DELETE FROM tweets
 WHERE id IN (
   SELECT t.id
@@ -641,3 +645,5 @@ FROM tweets JOIN users on tweets.user_id = users.id;
 
 SELECT * FROM taggings;
 SELECT id, name, tweets FROM tags;
+
+SELECT * from views.retweets;

@@ -45,9 +45,6 @@ SELECT * FROM mentions;
 
 -------------------------------------------------------------------------------
 
-SELECT username, tweets.favorites, replies, retweets, tweets.mentions, tags
-FROM tweets JOIN users on tweets.user_id = users.id;
-
 DELETE FROM tweets
 WHERE id IN (
   SELECT t.id
@@ -72,3 +69,5 @@ FROM tweets JOIN users on tweets.user_id = users.id;
 
 SELECT * FROM taggings;
 SELECT id, name, tweets FROM tags;
+
+SELECT * from views.retweets;
