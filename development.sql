@@ -4,8 +4,8 @@ SET client_min_messages TO WARNING;
 DROP SCHEMA "public" CASCADE;
 DROP SCHEMA "views" CASCADE;
 SET client_min_messages TO NOTICE;
-CREATE SCHEMA "views";
 CREATE SCHEMA "public";
+CREATE SCHEMA "views";
 CREATE EXTENSION "uuid-ossp";
 -- Parse tokens like tags and mentions from text
 --
@@ -546,7 +546,8 @@ CREATE TRIGGER update_user_tweets
 
 CREATE TRIGGER parse_mentions
   BEFORE INSERT OR UPDATE ON tweets
-  FOR EACH ROW EXECUTE PROCEDURE parse_mentions_from_post();
+  FOR EACH ROW
+  EXECUTE PROCEDURE parse_mentions_from_post();
 
 CREATE TRIGGER create_mentions
   AFTER INSERT OR UPDATE ON tweets

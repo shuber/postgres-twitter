@@ -91,7 +91,8 @@ CREATE TRIGGER update_user_tweets
 
 CREATE TRIGGER parse_mentions
   BEFORE INSERT OR UPDATE ON tweets
-  FOR EACH ROW EXECUTE PROCEDURE parse_mentions_from_post();
+  FOR EACH ROW
+  EXECUTE PROCEDURE parse_mentions_from_post();
 
 CREATE TRIGGER create_mentions
   AFTER INSERT OR UPDATE ON tweets
