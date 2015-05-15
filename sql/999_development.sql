@@ -10,28 +10,28 @@ INSERT INTO users (username) VALUES
   ('tom');
 
 INSERT INTO tweets (post, user_id) VALUES
-  ('My first tweet!', random_user_id()),
-  ('Another tweet with a tag! #hello-world @missing', random_user_id()),
-  ('My second tweet! #hello-world #hello-world-again', random_user_id()),
-  ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane', random_user_id()),
-  ('@steve hola!', random_user_id()),
-  ('@bob I am! #imhungry #metoo #gimmefood #now', random_user_id());
+  ('My first tweet!', random.id('users')),
+  ('Another tweet with a tag! #hello-world @missing', random.id('users')),
+  ('My second tweet! #hello-world #hello-world-again', random.id('users')),
+  ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane', random.id('users')),
+  ('@steve hola!', random.id('users')),
+  ('@bob I am! #imhungry #metoo #gimmefood #now', random.id('users'));
 
 INSERT INTO favorites (user_id, tweet_id)
-SELECT id as user_id, random_tweet_id() as tweet_id
+SELECT id as user_id, random.id('tweets') as tweet_id
 FROM users;
 
 INSERT INTO followers (follower_id, user_id)
-SELECT id as follower_id, random_user_id(id) as user_id
+SELECT id as follower_id, random.id('users', id) as user_id
 FROM users;
 
 INSERT INTO replies (tweet_id, reply_id)
-SELECT id as tweet_id, random_tweet_id(id) as reply_id
+SELECT id as tweet_id, random.id('tweets', id) as reply_id
 FROM tweets
 LIMIT 2;
 
 INSERT INTO retweets (tweet_id, retweet_id)
-SELECT id as tweet_id, random_tweet_id(id) as retweet_id
+SELECT id as tweet_id, random.id('tweets', id) as retweet_id
 FROM tweets
 LIMIT 2;
 

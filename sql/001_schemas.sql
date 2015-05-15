@@ -1,2 +1,3 @@
 CREATE SCHEMA "public";
+CREATE SCHEMA "random";
 CREATE SCHEMA "views";

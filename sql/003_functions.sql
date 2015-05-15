@@ -30,54 +30,44 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
 
 -------------------------------------------------------------------------------
 
-CREATE FUNCTION random_tweet_id()
+CREATE FUNCTION random.id(table_name text)
   RETURNS uuid AS $$
     DECLARE
-      uuid uuid;
+      record record;
     BEGIN
-      uuid := uuid_generate_v4();
-      RETURN random_tweet_id(uuid);
+      record := random.record(table_name);
+      RETURN record.id;
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 
-CREATE FUNCTION random_tweet_id(exclude uuid)
+CREATE FUNCTION random.id(table_name text, exclude uuid)
   RETURNS uuid AS $$
     DECLARE
-      uuid uuid;
+      record record;
     BEGIN
-      SELECT id
-      FROM tweets
-      WHERE id != exclude
-      ORDER BY random()
-      LIMIT 1
-      INTO uuid;
-      RETURN uuid;
+      record := random.record(table_name, exclude);
+      RETURN record.id;
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 
--------------------------------------------------------------------------------
-
-CREATE FUNCTION random_user_id()
-  RETURNS uuid AS $$
+CREATE FUNCTION random.record(table_name text)
+  RETURNS record AS $$
     DECLARE
-      uuid uuid;
+      exclude uuid := uuid_generate_v4();
     BEGIN
-      uuid := uuid_generate_v4();
-      RETURN random_user_id(uuid);
+      RETURN random.record(table_name, exclude);
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 
-CREATE FUNCTION random_user_id(exclude uuid)
-  RETURNS uuid AS $$
+CREATE FUNCTION random.record(table_name text, exclude uuid)
+  RETURNS record AS $$
     DECLARE
-      user_id uuid;
+      record record;
     BEGIN
-      SELECT id
-      FROM users
-      WHERE id != exclude
-      ORDER BY random()
-      LIMIT 1
-      INTO user_id;
-      RETURN user_id;
+      EXECUTE 'SELECT * FROM ' || table_name || ' WHERE id != $1 ORDER BY random() LIMIT 1'
+      INTO record
+      USING exclude;
+
+      RETURN record;
     END;
   $$ LANGUAGE plpgsql VOLATILE;

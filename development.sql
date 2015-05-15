@@ -2,9 +2,11 @@
 -- Silently drop everything in reverse (for development)
 SET client_min_messages TO WARNING;
 DROP SCHEMA "public" CASCADE;
+DROP SCHEMA "random" CASCADE;
 DROP SCHEMA "views" CASCADE;
 SET client_min_messages TO NOTICE;
 CREATE SCHEMA "public";
+CREATE SCHEMA "random";
 CREATE SCHEMA "views";
 CREATE EXTENSION "uuid-ossp";
 -- Parse tokens like tags and mentions from text
@@ -39,55 +41,45 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
 
 -------------------------------------------------------------------------------
 
-CREATE FUNCTION random_tweet_id()
+CREATE FUNCTION random.id(table_name text)
   RETURNS uuid AS $$
     DECLARE
-      uuid uuid;
+      record record;
     BEGIN
-      uuid := uuid_generate_v4();
-      RETURN random_tweet_id(uuid);
+      record := random.record(table_name);
+      RETURN record.id;
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 
-CREATE FUNCTION random_tweet_id(exclude uuid)
+CREATE FUNCTION random.id(table_name text, exclude uuid)
   RETURNS uuid AS $$
     DECLARE
-      uuid uuid;
+      record record;
     BEGIN
-      SELECT id
-      FROM tweets
-      WHERE id != exclude
-      ORDER BY random()
-      LIMIT 1
-      INTO uuid;
-      RETURN uuid;
+      record := random.record(table_name, exclude);
+      RETURN record.id;
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 
--------------------------------------------------------------------------------
-
-CREATE FUNCTION random_user_id()
-  RETURNS uuid AS $$
+CREATE FUNCTION random.record(table_name text)
+  RETURNS record AS $$
     DECLARE
-      uuid uuid;
+      exclude uuid := uuid_generate_v4();
     BEGIN
-      uuid := uuid_generate_v4();
-      RETURN random_user_id(uuid);
+      RETURN random.record(table_name, exclude);
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 
-CREATE FUNCTION random_user_id(exclude uuid)
-  RETURNS uuid AS $$
+CREATE FUNCTION random.record(table_name text, exclude uuid)
+  RETURNS record AS $$
     DECLARE
-      user_id uuid;
+      record record;
     BEGIN
-      SELECT id
-      FROM users
-      WHERE id != exclude
-      ORDER BY random()
-      LIMIT 1
-      INTO user_id;
-      RETURN user_id;
+      EXECUTE 'SELECT * FROM ' || table_name || ' WHERE id != $1 ORDER BY random() LIMIT 1'
+      INTO record
+      USING exclude;
+
+      RETURN record;
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 -- ############################################################################
@@ -588,28 +580,28 @@ INSERT INTO users (username) VALUES
   ('tom');
 
 INSERT INTO tweets (post, user_id) VALUES
-  ('My first tweet!', random_user_id()),
-  ('Another tweet with a tag! #hello-world @missing', random_user_id()),
-  ('My second tweet! #hello-world #hello-world-again', random_user_id()),
-  ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane', random_user_id()),
-  ('@steve hola!', random_user_id()),
-  ('@bob I am! #imhungry #metoo #gimmefood #now', random_user_id());
+  ('My first tweet!', random.id('users')),
+  ('Another tweet with a tag! #hello-world @missing', random.id('users')),
+  ('My second tweet! #hello-world #hello-world-again', random.id('users')),
+  ('Is anyone else hungry? #imHUNGRY #gimmefood @TOM @jane', random.id('users')),
+  ('@steve hola!', random.id('users')),
+  ('@bob I am! #imhungry #metoo #gimmefood #now', random.id('users'));
 
 INSERT INTO favorites (user_id, tweet_id)
-SELECT id as user_id, random_tweet_id() as tweet_id
+SELECT id as user_id, random.id('tweets') as tweet_id
 FROM users;
 
 INSERT INTO followers (follower_id, user_id)
-SELECT id as follower_id, random_user_id(id) as user_id
+SELECT id as follower_id, random.id('users', id) as user_id
 FROM users;
 
 INSERT INTO replies (tweet_id, reply_id)
-SELECT id as tweet_id, random_tweet_id(id) as reply_id
+SELECT id as tweet_id, random.id('tweets', id) as reply_id
 FROM tweets
 LIMIT 2;
 
 INSERT INTO retweets (tweet_id, retweet_id)
-SELECT id as tweet_id, random_tweet_id(id) as retweet_id
+SELECT id as tweet_id, random.id('tweets', id) as retweet_id
 FROM tweets
 LIMIT 2;
 
