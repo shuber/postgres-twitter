@@ -259,6 +259,7 @@ CREATE TABLE favorites (
 CREATE TABLE followers (
   user_id      uuid NOT NULL,
   follower_id  uuid NOT NULL,
+  created      timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
   PRIMARY KEY(user_id, follower_id)
 );
 
@@ -269,7 +270,7 @@ CREATE TABLE mentions (
 );
 
 CREATE TABLE replies (
-  tweet_id    uuid NOT NULL,
+  tweet_id  uuid NOT NULL,
   reply_id  uuid NOT NULL,
   PRIMARY KEY(tweet_id, reply_id)
 );
