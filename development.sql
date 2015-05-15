@@ -41,17 +41,7 @@ CREATE FUNCTION parse_tokens(content text, prefix text)
 
 -------------------------------------------------------------------------------
 
-CREATE FUNCTION random.id(table_name text)
-  RETURNS uuid AS $$
-    DECLARE
-      record record;
-    BEGIN
-      record := random.record(table_name);
-      RETURN record.id;
-    END;
-  $$ LANGUAGE plpgsql VOLATILE;
-
-CREATE FUNCTION random.id(table_name text, exclude uuid)
+CREATE FUNCTION random.id(table_name text, exclude uuid DEFAULT uuid_generate_v4())
   RETURNS uuid AS $$
     DECLARE
       record record;
@@ -61,16 +51,7 @@ CREATE FUNCTION random.id(table_name text, exclude uuid)
     END;
   $$ LANGUAGE plpgsql VOLATILE;
 
-CREATE FUNCTION random.record(table_name text)
-  RETURNS record AS $$
-    DECLARE
-      exclude uuid := uuid_generate_v4();
-    BEGIN
-      RETURN random.record(table_name, exclude);
-    END;
-  $$ LANGUAGE plpgsql VOLATILE;
-
-CREATE FUNCTION random.record(table_name text, exclude uuid)
+CREATE FUNCTION random.record(table_name text, exclude uuid DEFAULT uuid_generate_v4())
   RETURNS record AS $$
     DECLARE
       record record;
