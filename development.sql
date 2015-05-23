@@ -232,7 +232,7 @@ CREATE TABLE favorites (
 CREATE TABLE followers (
   user_id      uuid NOT NULL,
   follower_id  uuid NOT NULL,
-  created      timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
+  created      timestamptz NOT NULL DEFAULT current_timestamp,
   PRIMARY KEY(user_id, follower_id)
 );
 
@@ -258,8 +258,8 @@ CREATE TABLE tags (
   id       uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
   name     text NOT NULL UNIQUE,
   tweets   integer NOT NULL DEFAULT 0,
-  created  timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
-  updated  timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
+  created  timestamptz NOT NULL DEFAULT current_timestamp,
+  updated  timestamptz NOT NULL DEFAULT current_timestamp
 );
 
 CREATE TABLE taggings (
@@ -277,8 +277,8 @@ CREATE TABLE tweets (
   retweets   integer NOT NULL DEFAULT 0,
   mentions   text[] NOT NULL DEFAULT '{}',
   tags       text[] NOT NULL DEFAULT '{}',
-  created    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
-  updated    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
+  created    timestamptz NOT NULL DEFAULT current_timestamp,
+  updated    timestamptz NOT NULL DEFAULT current_timestamp
 );
 
 CREATE TABLE users (
@@ -289,8 +289,8 @@ CREATE TABLE users (
   following  integer NOT NULL DEFAULT 0,
   mentions   integer NOT NULL DEFAULT 0,
   tweets     integer NOT NULL DEFAULT 0,
-  created    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
-  updated    timestamp WITH TIME ZONE NOT NULL DEFAULT current_timestamp
+  created    timestamptz NOT NULL DEFAULT current_timestamp,
+  updated    timestamptz NOT NULL DEFAULT current_timestamp
 );
 CREATE VIEW views.retweets AS
   SELECT r.tweet_id, t.*
