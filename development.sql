@@ -185,40 +185,48 @@ CREATE FUNCTION delete_old_taggings()
       RETURN NEW;
     END;
   $$ LANGUAGE plpgsql;
+CREATE FUNCTION increment_counter(table_name text, column_name text, pk_name text, pk_value uuid, step integer)
+  RETURNS VOID AS $$
+    DECLARE
+      table_name text := quote_ident(table_name);
+      column_name text := quote_ident(column_name);
+      conditions text := ' WHERE ' || quote_ident(pk_name) || ' = $1';
+      updates text := column_name || '=' || column_name || '+' || step;
+    BEGIN
+      EXECUTE 'UPDATE ' || table_name || ' SET ' || updates || conditions
+      USING pk_value;
+    END;
+  $$ LANGUAGE plpgsql;
+
 CREATE FUNCTION counter_cache()
   RETURNS trigger AS $$
     DECLARE
-      table_name text;
-      column_name text;
-      foreign_key_name text;
-      id_name text;
-
-      foreign_key uuid;
-      increment integer;
-      incrementor text;
-
+      table_name text := quote_ident(TG_ARGV[0]);
+      counter_name text := quote_ident(TG_ARGV[1]);
+      fk_name text := quote_ident(TG_ARGV[2]);
+      pk_name text := quote_ident(TG_ARGV[3]);
+      fk_changed boolean;
+      fk_value uuid;
       record record;
     BEGIN
-      table_name := quote_ident(TG_ARGV[0]);
-      column_name := quote_ident(TG_ARGV[1]);
-      foreign_key_name := quote_ident(TG_ARGV[2]);
-      id_name := quote_ident(TG_ARGV[3]);
-
-      IF TG_OP = 'INSERT' THEN
+      IF TG_OP = 'UPDATE' THEN
         record := NEW;
-        increment := 1;
-      ELSE
-        record := OLD;
-        increment := -1;
+        EXECUTE 'SELECT ($1).' || fk_name || ' != ' || '($2).' || fk_name
+        INTO fk_changed
+        USING OLD, NEW;
       END IF;
 
-      EXECUTE 'SELECT ($1).' || quote_ident(foreign_key_name)
-      INTO foreign_key
-      USING record;
+      IF TG_OP = 'DELETE' OR (TG_OP = 'UPDATE' AND fk_changed) THEN
+        record := OLD;
+        EXECUTE 'SELECT ($1).' || fk_name INTO fk_value USING record;
+        PERFORM increment_counter(table_name, counter_name, pk_name, fk_value, -1);
+      END IF;
 
-      incrementor := column_name || ' = ' || column_name || ' + ' || increment;
-      EXECUTE 'UPDATE ' || table_name || ' SET ' || incrementor || ' WHERE id = $1'
-      USING foreign_key;
+      IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND fk_changed) THEN
+        record := NEW;
+        EXECUTE 'SELECT ($1).' || fk_name INTO fk_value USING record;
+        PERFORM increment_counter(table_name, counter_name, pk_name, fk_value, 1);
+      END IF;
 
       RETURN record;
     END;
@@ -432,14 +440,12 @@ CREATE UNIQUE INDEX ON users (LOWER(username));
 -- ############################################################################
 
 CREATE TRIGGER update_tweet_favorites
-  AFTER INSERT OR DELETE ON favorites
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('tweets', 'favorites', 'tweet_id', 'tweet_id');
+  AFTER INSERT OR UPDATE OR DELETE ON favorites
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tweets', 'favorites', 'tweet_id', 'id');
 
 CREATE TRIGGER update_user_favorites
-  AFTER INSERT OR DELETE ON favorites
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'favorites', 'user_id', 'user_id');
+  AFTER INSERT OR UPDATE OR DELETE ON favorites
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'favorites', 'user_id', 'id');
 
 
 -- ############################################################################
@@ -447,14 +453,12 @@ CREATE TRIGGER update_user_favorites
 -- ############################################################################
 
 CREATE TRIGGER update_follower_following
-  AFTER INSERT OR DELETE ON followers
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'following', 'follower_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON followers
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'following', 'follower_id', 'id');
 
 CREATE TRIGGER update_user_followers
-  AFTER INSERT OR DELETE ON followers
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'followers', 'user_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON followers
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'followers', 'user_id', 'id');
 
 
 -- ############################################################################
@@ -462,9 +466,8 @@ CREATE TRIGGER update_user_followers
 -- ############################################################################
 
 CREATE TRIGGER update_user_mentions
-  AFTER INSERT OR DELETE ON mentions
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'mentions', 'user_id', 'user_id');
+  AFTER INSERT OR UPDATE OR DELETE ON mentions
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'mentions', 'user_id', 'id');
 
 
 -- ############################################################################
@@ -472,9 +475,8 @@ CREATE TRIGGER update_user_mentions
 -- ############################################################################
 
 CREATE TRIGGER update_tweet_replies
-  AFTER INSERT OR DELETE ON replies
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('tweets', 'replies', 'tweet_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON replies
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tweets', 'replies', 'tweet_id', 'id');
 
 
 -- ############################################################################
@@ -482,9 +484,8 @@ CREATE TRIGGER update_tweet_replies
 -- ############################################################################
 
 CREATE TRIGGER update_tweet_retweets
-  AFTER INSERT OR DELETE ON retweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('tweets', 'retweets', 'tweet_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON retweets
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tweets', 'retweets', 'tweet_id', 'id');
 
 
 -- ############################################################################
@@ -502,9 +503,8 @@ CREATE TRIGGER delete_stale_tags
 -- ############################################################################
 
 CREATE TRIGGER update_tag_tweets
-  AFTER INSERT OR DELETE ON taggings
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('tags', 'tweets', 'tag_id', 'tag_id');
+  AFTER INSERT OR UPDATE OR DELETE ON taggings
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tags', 'tweets', 'tag_id', 'id');
 
 
 -- ############################################################################
@@ -512,21 +512,18 @@ CREATE TRIGGER update_tag_tweets
 -- ############################################################################
 
 CREATE TRIGGER update_user_tweets
-  AFTER INSERT OR DELETE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON tweets
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
 
 -------------------------------------------------------------------------------
 
 CREATE TRIGGER parse_mentions
   BEFORE INSERT OR UPDATE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE parse_mentions_from_post();
+  FOR EACH ROW EXECUTE PROCEDURE parse_mentions_from_post();
 
 CREATE TRIGGER create_mentions
   AFTER INSERT OR UPDATE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE create_new_mentions();
+  FOR EACH ROW EXECUTE PROCEDURE create_new_mentions();
 
 CREATE TRIGGER delete_mentions
   AFTER UPDATE ON tweets
@@ -537,13 +534,11 @@ CREATE TRIGGER delete_mentions
 
 CREATE TRIGGER parse_taggings
   BEFORE INSERT OR UPDATE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE parse_tags_from_post();
+  FOR EACH ROW EXECUTE PROCEDURE parse_tags_from_post();
 
 CREATE TRIGGER create_taggings
   AFTER INSERT OR UPDATE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE create_new_taggings();
+  FOR EACH ROW EXECUTE PROCEDURE create_new_taggings();
 
 CREATE TRIGGER delete_taggings
   AFTER UPDATE ON tweets

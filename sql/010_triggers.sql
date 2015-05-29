@@ -3,14 +3,12 @@
 -- ############################################################################
 
 CREATE TRIGGER update_tweet_favorites
-  AFTER INSERT OR DELETE ON favorites
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('tweets', 'favorites', 'tweet_id', 'tweet_id');
+  AFTER INSERT OR UPDATE OR DELETE ON favorites
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tweets', 'favorites', 'tweet_id', 'id');
 
 CREATE TRIGGER update_user_favorites
-  AFTER INSERT OR DELETE ON favorites
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'favorites', 'user_id', 'user_id');
+  AFTER INSERT OR UPDATE OR DELETE ON favorites
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'favorites', 'user_id', 'id');
 
 
 -- ############################################################################
@@ -18,14 +16,12 @@ CREATE TRIGGER update_user_favorites
 -- ############################################################################
 
 CREATE TRIGGER update_follower_following
-  AFTER INSERT OR DELETE ON followers
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'following', 'follower_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON followers
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'following', 'follower_id', 'id');
 
 CREATE TRIGGER update_user_followers
-  AFTER INSERT OR DELETE ON followers
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'followers', 'user_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON followers
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'followers', 'user_id', 'id');
 
 
 -- ############################################################################
@@ -33,9 +29,8 @@ CREATE TRIGGER update_user_followers
 -- ############################################################################
 
 CREATE TRIGGER update_user_mentions
-  AFTER INSERT OR DELETE ON mentions
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'mentions', 'user_id', 'user_id');
+  AFTER INSERT OR UPDATE OR DELETE ON mentions
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'mentions', 'user_id', 'id');
 
 
 -- ############################################################################
@@ -43,9 +38,8 @@ CREATE TRIGGER update_user_mentions
 -- ############################################################################
 
 CREATE TRIGGER update_tweet_replies
-  AFTER INSERT OR DELETE ON replies
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('tweets', 'replies', 'tweet_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON replies
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tweets', 'replies', 'tweet_id', 'id');
 
 
 -- ############################################################################
@@ -53,9 +47,8 @@ CREATE TRIGGER update_tweet_replies
 -- ############################################################################
 
 CREATE TRIGGER update_tweet_retweets
-  AFTER INSERT OR DELETE ON retweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('tweets', 'retweets', 'tweet_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON retweets
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tweets', 'retweets', 'tweet_id', 'id');
 
 
 -- ############################################################################
@@ -73,9 +66,8 @@ CREATE TRIGGER delete_stale_tags
 -- ############################################################################
 
 CREATE TRIGGER update_tag_tweets
-  AFTER INSERT OR DELETE ON taggings
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('tags', 'tweets', 'tag_id', 'tag_id');
+  AFTER INSERT OR UPDATE OR DELETE ON taggings
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('tags', 'tweets', 'tag_id', 'id');
 
 
 -- ############################################################################
@@ -83,21 +75,18 @@ CREATE TRIGGER update_tag_tweets
 -- ############################################################################
 
 CREATE TRIGGER update_user_tweets
-  AFTER INSERT OR DELETE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
+  AFTER INSERT OR UPDATE OR DELETE ON tweets
+  FOR EACH ROW EXECUTE PROCEDURE counter_cache('users', 'tweets', 'user_id', 'id');
 
 -------------------------------------------------------------------------------
 
 CREATE TRIGGER parse_mentions
   BEFORE INSERT OR UPDATE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE parse_mentions_from_post();
+  FOR EACH ROW EXECUTE PROCEDURE parse_mentions_from_post();
 
 CREATE TRIGGER create_mentions
   AFTER INSERT OR UPDATE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE create_new_mentions();
+  FOR EACH ROW EXECUTE PROCEDURE create_new_mentions();
 
 CREATE TRIGGER delete_mentions
   AFTER UPDATE ON tweets
@@ -108,13 +97,11 @@ CREATE TRIGGER delete_mentions
 
 CREATE TRIGGER parse_taggings
   BEFORE INSERT OR UPDATE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE parse_tags_from_post();
+  FOR EACH ROW EXECUTE PROCEDURE parse_tags_from_post();
 
 CREATE TRIGGER create_taggings
   AFTER INSERT OR UPDATE ON tweets
-  FOR EACH ROW
-  EXECUTE PROCEDURE create_new_taggings();
+  FOR EACH ROW EXECUTE PROCEDURE create_new_taggings();
 
 CREATE TRIGGER delete_taggings
   AFTER UPDATE ON tweets

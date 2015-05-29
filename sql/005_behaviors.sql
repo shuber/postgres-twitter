@@ -1,37 +1,45 @@
+CREATE FUNCTION increment_counter(table_name text, column_name text, pk_name text, pk_value uuid, step integer)
+  RETURNS VOID AS $$
+    DECLARE
+      table_name text := quote_ident(table_name);
+      column_name text := quote_ident(column_name);
+      conditions text := ' WHERE ' || quote_ident(pk_name) || ' = $1';
+      updates text := column_name || '=' || column_name || '+' || step;
+    BEGIN
+      EXECUTE 'UPDATE ' || table_name || ' SET ' || updates || conditions
+      USING pk_value;
+    END;
+  $$ LANGUAGE plpgsql;
+
 CREATE FUNCTION counter_cache()
   RETURNS trigger AS $$
     DECLARE
-      table_name text;
-      column_name text;
-      foreign_key_name text;
-      id_name text;
-
-      foreign_key uuid;
-      increment integer;
-      incrementor text;
-
+      table_name text := quote_ident(TG_ARGV[0]);
+      counter_name text := quote_ident(TG_ARGV[1]);
+      fk_name text := quote_ident(TG_ARGV[2]);
+      pk_name text := quote_ident(TG_ARGV[3]);
+      fk_changed boolean;
+      fk_value uuid;
       record record;
     BEGIN
-      table_name := quote_ident(TG_ARGV[0]);
-      column_name := quote_ident(TG_ARGV[1]);
-      foreign_key_name := quote_ident(TG_ARGV[2]);
-      id_name := quote_ident(TG_ARGV[3]);
-
-      IF TG_OP = 'INSERT' THEN
+      IF TG_OP = 'UPDATE' THEN
         record := NEW;
-        increment := 1;
-      ELSE
-        record := OLD;
-        increment := -1;
+        EXECUTE 'SELECT ($1).' || fk_name || ' != ' || '($2).' || fk_name
+        INTO fk_changed
+        USING OLD, NEW;
       END IF;
 
-      EXECUTE 'SELECT ($1).' || quote_ident(foreign_key_name)
-      INTO foreign_key
-      USING record;
+      IF TG_OP = 'DELETE' OR (TG_OP = 'UPDATE' AND fk_changed) THEN
+        record := OLD;
+        EXECUTE 'SELECT ($1).' || fk_name INTO fk_value USING record;
+        PERFORM increment_counter(table_name, counter_name, pk_name, fk_value, -1);
+      END IF;
 
-      incrementor := column_name || ' = ' || column_name || ' + ' || increment;
-      EXECUTE 'UPDATE ' || table_name || ' SET ' || incrementor || ' WHERE id = $1'
-      USING foreign_key;
+      IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND fk_changed) THEN
+        record := NEW;
+        EXECUTE 'SELECT ($1).' || fk_name INTO fk_value USING record;
+        PERFORM increment_counter(table_name, counter_name, pk_name, fk_value, 1);
+      END IF;
 
       RETURN record;
     END;
