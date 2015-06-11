@@ -1,7 +1,10 @@
 # Postgres Twitter
 
-This is an experimental build of a simple "twitter" application in Postgres.
+This is an experimental build of a simple "twitter" application in Postgres. The goal is to push as much logic into the database as possible. This includes contraints, validations, functions, and triggers!
 
+## Schema
+
+<img src="https://raw.githubusercontent.com/shuber/postgres-twitter/master/schema.png" />
 
 ## Development
 
@@ -45,44 +48,6 @@ The `compile` executable combines all files under sql/ into `compiled.sql` or `d
 * [x] tags
 * [x] tweets
 * [x] users
-
-
-## Ideas for API
-
-#### The `random` schema
-
-This is mostly for development. This object contains methods to return a random record from various tables. Also add `_id` suffixed versions of the methods to return a random record's primary key.
-
-* `random.tag()`
-* `random.tweet()`
-* `random.user()`
-
-#### The `tweets` schema
-
-Public API for interacting with tweets
-
-* `tweets.create`
-* `tweets.delete`
-* `tweets.find`
-* `tweets.for_user`
-* `tweets.update`
-
-Public API for interacting with tags
-
-* `tags.find_or_create(name text)`
-* `tags.listen(names text[])`
-* `tags.tweets(names text[])`
-
-Or maybe put everything under the `api` schema
-
-* `api.create_reply(tweet_id uuid, post text, user_id uuid)`
-* `api.create_retweet(tweet_id uuid, post text, user_id uuid)`
-* `api.create_tweet(post text, user_id uuid)`
-* `api.delete_tweet(tweet_id uuid)`
-* `api.favorite_tweet(tweet_id uuid, user_id uuid)`
-* `api.unfavorite_tweet(tweet_id uuid, user_id uuid)`
-* `api.follow_user(user_id uuid, follower_id uuid)`
-* `api.unfollow_user(user_id uuid, follower_id uuid)`
 
 
 ## Sample Input
@@ -207,3 +172,41 @@ Or maybe put everything under the `api` schema
      c2620f3c-5a5c-4fa5-88f4-f01e2e12173e | gimmefood         |      1
      3efbea1c-3002-4b87-917b-d3ead6483983 | imhungry          |      1
     (4 rows)
+
+
+## Ideas for API
+
+#### The `random` schema
+
+This is mostly for development. This object contains methods to return a random record from various tables. Also add `_id` suffixed versions of the methods to return a random record's primary key.
+
+* `random.tag()`
+* `random.tweet()`
+* `random.user()`
+
+#### The `tweets` schema
+
+Public API for interacting with tweets
+
+* `tweets.create`
+* `tweets.delete`
+* `tweets.find`
+* `tweets.for_user`
+* `tweets.update`
+
+Public API for interacting with tags
+
+* `tags.find_or_create(name text)`
+* `tags.listen(names text[])`
+* `tags.tweets(names text[])`
+
+Or maybe put everything under the `api` schema
+
+* `api.create_reply(tweet_id uuid, post text, user_id uuid)`
+* `api.create_retweet(tweet_id uuid, post text, user_id uuid)`
+* `api.create_tweet(post text, user_id uuid)`
+* `api.delete_tweet(tweet_id uuid)`
+* `api.favorite_tweet(tweet_id uuid, user_id uuid)`
+* `api.unfavorite_tweet(tweet_id uuid, user_id uuid)`
+* `api.follow_user(user_id uuid, follower_id uuid)`
+* `api.unfollow_user(user_id uuid, follower_id uuid)`
